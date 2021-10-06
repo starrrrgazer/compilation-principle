@@ -3,6 +3,6 @@
   <component name="Encoding">
     <file url="file://$PROJECT_DIR$/Dockerfile" charset="GBK" />
     <file url="file://$PROJECT_DIR$/judge.toml" charset="GBK" />
-    <file url="file://$PROJECT_DIR$/src/Lexer.java" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/src/Lexer.java" charset="UTF-8" />
   </component>
 </project>
