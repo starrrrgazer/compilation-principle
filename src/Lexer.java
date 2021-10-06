@@ -31,7 +31,6 @@ public class Lexer {
         System.out.println(output[index]);
     }
 
-    ;
 
     int getIndexOfStringArr(String str, String[] strings) {
         int len = strings.length;
