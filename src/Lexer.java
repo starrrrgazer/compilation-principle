@@ -106,9 +106,14 @@ public class Lexer {
         String input = scanner.nextLine();
         while (!input.isEmpty()) {
             String[] inputArr = input.trim().split("\\s+");
-            input = scanner.nextLine();
             for (String str : inputArr) {
                 lexer.lexAnalyze(str);
+            }
+            if(scanner.hasNext()){
+                input = scanner.nextLine();
+            }
+            else{
+                break;
             }
         }
         System.exit(0);
