@@ -44,35 +44,31 @@ public class Lexer {
         return -1;
     }
     void lexAnalyze(String str){
-        //这个字符串就是token
         int index = getIndexOfStringArr(str, tokenString);
         if(index != -1){
             printToken(index);
             return;
         }
-        //这个字符串不是token
         char[] chars = str.toCharArray();
         int len = str.length();
         for(int i = 0;i < len; i++){
             int index1 = getIndexOfCharArr(chars[i],tokenChar);
 //            System.out.println(str + " index:" + index + " index1:" + index1);
-            //非 = 的特殊符号
             if(index1 > 0){
                 printToken(index1);
             }
-            //是 =
             else if(index1 == 0){
-                //是 ==
+
                 if(i+1<len && chars[i+1] == '='){
                     System.out.println("Eq");
                     i++;
                 }
-                //只是 =
+
                 else{
                     printToken(index1);
                 }
             }
-            //是数字
+
             else if(Character.isDigit(chars[i])){
                 int j=i+1;
                 while(j<len && Character.isDigit(chars[j])){
@@ -81,18 +77,18 @@ public class Lexer {
                 printNumber(str.substring(i,j));
                 i=j-1;
             }
-            //是标识符
+
             else if(Character.isLetter(chars[i]) ||  chars[i] == '_'){
                 int j=i+1;
                 while(j<len && (Character.isLetter(chars[j]) ||  chars[j] == '_' || Character.isDigit(chars[j]))){
                     j++;
                 }
                 int index2 = getIndexOfStringArr(str.substring(i,j),tokenString);
-                //就是标识符
+
                 if(index2 == -1){
                     printIdent(str.substring(i,j));
                 }
-                //这个子字符串是其他token
+
                 else{
                     printToken(index2);
                 }
