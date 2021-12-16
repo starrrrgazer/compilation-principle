@@ -1,5 +1,6 @@
 FROM openjdk:14
-COPY ./ /myapp/
-WORKDIR /myapp/
+WORKDIR /app/
+COPY *.java ./
+COPY *.jar ./
 ENV CLASSPATH=.:antlr-4.9.3-complete.jar
-RUN javac -cp src/ src/LabTest.java -d dst/
+RUN javac -d ./ *.java
