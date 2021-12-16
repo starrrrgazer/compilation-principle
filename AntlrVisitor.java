@@ -134,6 +134,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         System.out.println("now visit primaryexp. primaryexp text is : " + ctx.Number());
         if(ctx.Number() != null){
             String number = String.valueOf(ctx.Number());
+            //hex or oct
             if(number.charAt(0) == '0'&& number.length()>1){
                 //hex
                 if(number.charAt(1) == 'x' || number.charAt(1) == 'X'){
@@ -143,6 +144,10 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 else {
                     stringBuilder.append(Integer.parseInt(number.substring(1),8));
                 }
+            }
+            //dec
+            else {
+                stringBuilder.append(number);
             }
         }
 
