@@ -62,7 +62,8 @@ lOrExp      :   lAndExp
 constExp    :   addExp;
 ident       :   Nondigit
                 | ident Nondigit
-                | ident Digit;
+                | ident digit;
+digit       :   '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' ;
 //number             : decimalconst | octalconst | hexadecimalconst;
 //decimalconst      : nonzerodigit | decimalconst digit;
 //octalconst        : '0' | octalconst octaldigit;
@@ -77,9 +78,28 @@ ident       :   Nondigit
 //                      | 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 //lexer
 Nondigit    :   [a-zA-Z_]+;
-Digit       :   [0-9]+;
 Number      :   [1-9][0-9]*           //decimal
                 | '0'                 //0
                 | '0'[0-7]*           //octal
                 | '0x'[a-fA-F0-9]*    //hex
                 | '0X'[a-fA-F0-9]*;
+//"=", ";", "(", ")", "{", "}", "+", "*", "/", "<", ">", "==",
+  //            "if", "else", "while", "break", "continue", "return"
+//Assign      :   '=';
+//Semicolon   :   ';';
+//LPar        :   '(';
+//RPar        :   ')';
+//LBrace      :   '{';
+//RBrace      :   '}';
+//Plus        :   '+';
+//Mult        :   '*';
+//Div         :   '/';
+//Lt          :   '<';
+//Gt          :   '>';
+//Eq          :   '==';
+//If          :   'if';
+//Else        :   'else';
+//While       :   'while';
+//Break       :   'break';
+//Continue    :   'continue';
+//Return      :   'return';

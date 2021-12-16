@@ -1,4 +1,5 @@
 FROM openjdk:14
 COPY ./ /myapp/
 WORKDIR /myapp/
-RUN javac -cp src/ src/Lexer.java -d dst/
+ENV CLASSPATH=.:antlr-4.9.3-complete.jar
+RUN javac -cp src/ src/LabTest.java -d dst/
