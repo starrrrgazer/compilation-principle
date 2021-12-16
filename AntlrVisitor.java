@@ -16,7 +16,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         visit(ctx.funcType());
         visit(ctx.ident());
         stringBuilder.append("(");
-        //这里应该有个visit param，因为暂时没用到，所以就直接添加两个括号了
+        //this should be a visit param
         stringBuilder.append(")");
         visit(ctx.block());
         return null;
