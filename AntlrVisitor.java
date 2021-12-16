@@ -132,7 +132,19 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     @Override
     public Object visitPrimaryExp(MiniSysParser.PrimaryExpContext ctx) {
         System.out.println("now visit primaryexp. primaryexp text is : " + ctx.Number());
-        stringBuilder.append(ctx.getText());
+        if(ctx.Number() != null){
+            String number = String.valueOf(ctx.Number());
+            if(number.charAt(0) == '0'){
+                //hex
+                if(number.charAt(1) == 'x' || number.charAt(1) == 'X'){
+                    stringBuilder.append(Integer.parseInt(number.substring(2),16));
+                }
+                //oct
+                else {
+                    stringBuilder.append(Integer.parseInt(number.substring(1),8));
+                }
+            }
+        }
 
         return super.visitPrimaryExp(ctx);
     }
