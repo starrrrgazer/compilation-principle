@@ -2,5 +2,5 @@
 image = { source= "dockerfile", path = "."}
 
 run = [
-  "java  -cp dst/:antlr-4.9.2-complete.jar LabTest  $input  $ir",
+  "java  -cp dst/:antlr-4.9.3-complete.jar LabTest  $input  $ir",
 ]
