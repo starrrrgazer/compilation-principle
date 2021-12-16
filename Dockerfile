@@ -1,4 +1,4 @@
-FROM openjdk:14
+FROM openjdk:15
 WORKDIR /app/
 COPY *.java ./
 COPY *.jar ./

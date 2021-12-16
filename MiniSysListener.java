@@ -1,4 +1,4 @@
-// Generated from D:/2021compile/compilation-principle/src\MiniSys.g4 by ANTLR 4.9.2
+// Generated from D:/2021compile/compilation-principle\MiniSys.g4 by ANTLR 4.9.2
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
 /**

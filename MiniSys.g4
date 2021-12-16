@@ -63,7 +63,7 @@ constExp    :   addExp;
 ident       :   Nondigit
                 | ident Nondigit
                 | ident digit;
-digit       :   '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' ;
+digit       :   Number;
 //number             : decimalconst | octalconst | hexadecimalconst;
 //decimalconst      : nonzerodigit | decimalconst digit;
 //octalconst        : '0' | octalconst octaldigit;
