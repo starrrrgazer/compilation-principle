@@ -1,6 +1,6 @@
 [jobs.lab1]
-image = { source = "dockerfile", path = "."}
+image = { source= "dockerfile", path = "."}
 
 run = [
-  "java LabTest  $input $ir",
+  "java  -cp dst/:antlr-4.9.2-complete.jar LabTest  $input  $ir",
 ]
