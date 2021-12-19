@@ -10,10 +10,11 @@ public class LabTest {
     public static void main(String[] args) {
         try {
             MyFunc myFunc = new MyFunc();
-
+            System.out.println("-------------------------");
             String input = myFunc.readFromFile(args[0]);
 //            String input = myFunc.readFromFile("D:\\2021compile\\compilation-principle\\input.txt");
             System.out.println(input);
+            System.out.println("-------------------------");
             CharStream charStream = CharStreams.fromString(input);
             MiniSysLexer miniSysLexer = new MiniSysLexer(charStream);
             CommonTokenStream tokens = new CommonTokenStream(miniSysLexer);
@@ -25,7 +26,7 @@ public class LabTest {
             antlrVisitor.visit(tree);
 
             System.out.println("-------------------------");
-            String output = antlrVisitor.getStringBuilder().toString();
+            String output = antlrVisitor.getOutputStringBuilder().toString();
             System.out.println(output);
             System.out.println("-------------------------");
 

@@ -1,23 +1,40 @@
+import java.util.ArrayList;
+import java.util.HashMap;
+
 public class AntlrVisitor extends MiniSysBaseVisitor {
-    StringBuilder stringBuilder = new StringBuilder();
-    String retString;
-    public StringBuilder getStringBuilder() {
-        return stringBuilder;
+
+    class Register{
+        String registerName;
+    }
+    StringBuilder outputStringBuilder = new StringBuilder();
+    String retType;
+    int registerNum = 0;
+    String operationNumber;
+
+
+
+    public StringBuilder getOutputStringBuilder() {
+        return outputStringBuilder;
     }
 
-    public void setStringBuilder(StringBuilder stringBuilder) {
-        this.stringBuilder = stringBuilder;
+    public void setOutputStringBuilder(StringBuilder outputStringBuilder) {
+        this.outputStringBuilder = outputStringBuilder;
+    }
+
+    public void initGlobalVariables(){
+        registerNum = 0;
+        operationNumber = null;
     }
 
     @Override
     public Object visitFuncDef(MiniSysParser.FuncDefContext ctx) {
         System.out.println("now visit funcdef");
-        stringBuilder.append("define dso_local ");
+        outputStringBuilder.append("define dso_local ");
         visit(ctx.funcType());
         visit(ctx.ident());
-        stringBuilder.append("(");
+        outputStringBuilder.append("(");
         //this should be a visit param
-        stringBuilder.append(")");
+        outputStringBuilder.append(")");
         visit(ctx.block());
         return null;
     }
@@ -72,8 +89,8 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     public Object visitFuncType(MiniSysParser.FuncTypeContext ctx) {
         System.out.println("now visit functype. "+ "functype.gettext is " + ctx.getText());
         if(ctx.getText().equals("int")){
-            retString = "i32 ";
-            stringBuilder.append("i32 ");
+            retType = "i32 ";
+            outputStringBuilder.append("i32 ");
         }
         return super.visitFuncType(ctx);
     }
@@ -91,9 +108,10 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     @Override
     public Object visitBlock(MiniSysParser.BlockContext ctx) {
         System.out.println("now visit block" + ". block.gettext is " + ctx.getText());
-        stringBuilder.append("{" + System.lineSeparator());
+        outputStringBuilder.append("{" + System.lineSeparator());
+        initGlobalVariables();
         super.visitBlock(ctx);
-        stringBuilder.append(System.lineSeparator() + "}");
+        outputStringBuilder.append(System.lineSeparator() + "}");
         return null;
     }
 
@@ -106,11 +124,15 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     @Override
     public Object visitStmt(MiniSysParser.StmtContext ctx) {
         System.out.println("now visit stmt. stmt text is : "+ ctx.getText());
-        String child0 = String.valueOf(ctx.getChild(0));
-        if(child0.equals("return")){
-            stringBuilder.append("ret " + retString);
+        if(ctx.children.size() == 3){
+            String child0 = String.valueOf(ctx.getChild(0));
+            if(child0.equals("return")){
+                super.visitStmt(ctx);
+                outputStringBuilder.append("ret " + retType + "%"+registerNum);
+            }
         }
-        return super.visitStmt(ctx);
+
+        return null;
     }
 
     @Override
@@ -131,37 +153,59 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitPrimaryExp(MiniSysParser.PrimaryExpContext ctx) {
-        System.out.println("now visit primaryexp. primaryexp text is : " + ctx.Number());
-        if(ctx.Number() != null){
-            String number = String.valueOf(ctx.Number());
+        System.out.println("now visit primaryexp. primaryexp text is : " + ctx.getText() );
+        if(ctx.exp() != null){
+            visit(ctx.exp());
+        }
+        else if(ctx.Number() != null){
+            int number;
+            String numberString = String.valueOf(ctx.Number());
             //hex or oct
-            if(number.charAt(0) == '0'&& number.length()>1){
+            if(numberString.charAt(0) == '0'&& numberString.length()>1){
                 //hex
-                if(number.charAt(1) == 'x' || number.charAt(1) == 'X'){
-                    stringBuilder.append(Integer.parseInt(number.substring(2),16));
+                if(numberString.charAt(1) == 'x' || numberString.charAt(1) == 'X'){
+                    number = Integer.parseInt(numberString.substring(2),16);
                 }
                 //oct
                 else {
-                    stringBuilder.append(Integer.parseInt(number.substring(1),8));
+                    number = Integer.parseInt(numberString.substring(1),8);
                 }
             }
             //dec
             else {
-                stringBuilder.append(number);
+                number = Integer.parseInt(numberString);
             }
+            operationNumber = String.valueOf(number);
+        }
+        else {
+            super.visitPrimaryExp(ctx);
         }
 
-        return super.visitPrimaryExp(ctx);
+        return null;
     }
 
     @Override
     public Object visitUnaryExp(MiniSysParser.UnaryExpContext ctx) {
         System.out.println("now visit unaryexp");
-        return super.visitUnaryExp(ctx);
+        if(ctx.children.size() == 1){
+            //primaryExp
+            super.visit(ctx.primaryExp());
+        }
+        else if(ctx.children.size() == 2){
+            //unaryOp unaryExp
+            visit(ctx.unaryExp());
+            if(ctx.unaryOp().getText().equals("-")){
+                registerNum++;
+                outputStringBuilder.append("%" + registerNum + " = sub " + "i32 " + "0" + ", "+operationNumber + System.lineSeparator());
+                operationNumber = "%" + registerNum;
+            }
+        }
+        return null;
     }
 
     @Override
     public Object visitUnaryOp(MiniSysParser.UnaryOpContext ctx) {
+        System.out.println("now visit unaryop. unaryop is : " + ctx.getText());
         return super.visitUnaryOp(ctx);
     }
 
@@ -173,13 +217,63 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     @Override
     public Object visitMulExp(MiniSysParser.MulExpContext ctx) {
         System.out.println("now visit mulexp");
-        return super.visitMulExp(ctx);
+        if(ctx.children.size() == 1){
+            visit(ctx.unaryExp());
+        }
+        else if(ctx.children.size() == 3){
+            String register1 = null;
+            String register2 = null;
+            visit(ctx.mulExp());
+            register1 = operationNumber;
+            visit(ctx.unaryExp());
+            register2 = operationNumber;
+
+            String op = String.valueOf(ctx.getChild(1));
+            registerNum++;
+            if(op.equals("*")){
+                outputStringBuilder.append("%" + registerNum + " = mul " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+            }
+            else if(op.equals("/")){
+                outputStringBuilder.append("%" + registerNum + " = sdiv " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+            }
+            else if(op.equals("%")){
+                outputStringBuilder.append("%" + registerNum + " = srem " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+            }
+            operationNumber = "%" + registerNum;
+        }
+        else {
+            super.visit(ctx);
+        }
+        return null;
     }
 
     @Override
     public Object visitAddExp(MiniSysParser.AddExpContext ctx) {
         System.out.println("now visit addexp");
-        return super.visitAddExp(ctx);
+        if(ctx.children.size() == 1){
+            visit(ctx.mulExp());
+        }
+        else if(ctx.children.size() == 3){
+            String register1 = null;
+            String register2 = null;
+            visit(ctx.addExp());
+            register1 = operationNumber;
+            visit(ctx.mulExp());
+            register2 = operationNumber;
+            String op = String.valueOf(ctx.getChild(1));
+            registerNum++;
+            if(op.equals("+")){
+                outputStringBuilder.append("%" + registerNum + " = add " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+            }
+            else if(op.equals("-")){
+                outputStringBuilder.append("%" + registerNum + " = sub " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+            }
+            operationNumber = "%" + registerNum;
+        }
+        else {
+            super.visit(ctx);
+        }
+        return null;
     }
 
     @Override
@@ -210,7 +304,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     @Override
     public Object visitIdent(MiniSysParser.IdentContext ctx) {
         System.out.println("now visit ident" + ". ident text is : " + ctx.getText());
-        stringBuilder.append("@" + ctx.getText());
+        outputStringBuilder.append("@" + ctx.getText());
         return super.visitIdent(ctx);
     }
 
