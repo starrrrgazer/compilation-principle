@@ -11,8 +11,8 @@ public class LabTest {
         try {
             MyFunc myFunc = new MyFunc();
             System.out.println("-------------------------");
-//            String input = myFunc.readFromFile(args[0]);
-            String input = myFunc.readFromFile("D:\\2021compile\\compilation-principle\\input.txt");
+            String input = myFunc.readFromFile(args[0]);
+//            String input = myFunc.readFromFile("D:\\2021compile\\compilation-principle\\input.txt");
             System.out.println(input);
             System.out.println("-------------------------");
             CharStream charStream = CharStreams.fromString(input);
@@ -30,8 +30,8 @@ public class LabTest {
             System.out.println(output);
             System.out.println("-------------------------");
 
-//            myFunc.writeToFile(args[1],output);
-            myFunc.writeToFile("D:\\2021compile\\compilation-principle\\output.txt",output);
+            myFunc.writeToFile(args[1],output);
+//            myFunc.writeToFile("D:\\2021compile\\compilation-principle\\output.txt",output);
 
             System.exit(0);
         }catch (Exception e){
