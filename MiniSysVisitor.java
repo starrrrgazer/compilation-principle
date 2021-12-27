@@ -1,4 +1,4 @@
-// Generated from MiniSys.g4 by ANTLR 4.9.3
+// Generated from D:/2021compile/compilation-principle\MiniSys.g4 by ANTLR 4.9.2
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
 /**
@@ -195,6 +195,12 @@ public interface MiniSysVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitIdent(MiniSysParser.IdentContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link MiniSysParser#nondigit}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitNondigit(MiniSysParser.NondigitContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link MiniSysParser#digit}.
 	 * @param ctx the parse tree

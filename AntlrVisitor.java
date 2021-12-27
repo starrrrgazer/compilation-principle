@@ -1,17 +1,18 @@
-import java.util.ArrayList;
 import java.util.HashMap;
+
 
 public class AntlrVisitor extends MiniSysBaseVisitor {
 
-    class Register{
-        String registerName;
-    }
+
     StringBuilder outputStringBuilder = new StringBuilder();
     String retType;
     int registerNum = 0;
+    String nowFuncName;
     String operationNumber;
-
-
+    HashMap<String,Register> registerHashMap_local = new HashMap<>(); //register is used to store information about variable
+    HashMap<String,Register> registerHashMap_global = new HashMap<>();
+    HashMap<String,Function> functionHashMap = new HashMap<>();
+    String bType; // when define var, set bType = btype
 
     public StringBuilder getOutputStringBuilder() {
         return outputStringBuilder;
@@ -47,12 +48,24 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitDecl(MiniSysParser.DeclContext ctx) {
-        return super.visitDecl(ctx);
+        System.out.println("now visit decl. decl.text is " + ctx.getText());
+        //constDecl
+        if(ctx.constDecl() != null){
+            super.visitDecl(ctx);
+        }
+        // varDecl
+        else if (ctx.varDecl() != null){
+            super.visitDecl(ctx);
+        }
+        return null;
     }
 
     @Override
     public Object visitConstDecl(MiniSysParser.ConstDeclContext ctx) {
-        return super.visitConstDecl(ctx);
+        System.out.println("now visit constDecl. constDecl.text is " + ctx.getText());
+        bType = ctx.bType().getText();
+        super.visitConstDecl(ctx); // visit varDef List
+        return null;
     }
 
     @Override
@@ -62,7 +75,28 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitConstDef(MiniSysParser.ConstDefContext ctx) {
-        return super.visitConstDef(ctx);
+        Register register = new Register();
+        registerNum++;
+        operationNumber = "%" + registerNum;
+
+        //bType : int
+        register.setiType(bType);
+        //set regName = ident
+        register.setRegName(ctx.getChild(0).getText());
+        register.setOperationNumber(operationNumber);
+        register.setConst(true);
+        register.setGlobal(false);
+        outputStringBuilder.append(operationNumber + " = alloca " + register.getiType() + System.lineSeparator());
+        // define name and value,that is,  constDef : ident = constInitVal
+        if (ctx.children.size() == 3){
+            visit(ctx.constInitVal());
+            outputStringBuilder.append("store i32 " + operationNumber + ", " + register.getiType() + "* "+ register.getOperationNumber() + System.lineSeparator());
+
+        }
+        //need to store local hashmap
+        registerHashMap_local.put(register.getRegName(),register);
+//        super.visitVarDef(ctx);
+        return null;
     }
 
     @Override
@@ -72,12 +106,43 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitVarDecl(MiniSysParser.VarDeclContext ctx) {
-        return super.visitVarDecl(ctx);
+        System.out.println("now visit varDecl. varDecl.text is " + ctx.getText());
+        bType = ctx.bType().getText();
+        super.visitVarDecl(ctx); // visit varDef List
+
+
+        return null;
     }
 
     @Override
     public Object visitVarDef(MiniSysParser.VarDefContext ctx) {
-        return super.visitVarDef(ctx);
+        Register register = new Register();
+        registerNum++;
+        operationNumber = "%" + registerNum;
+
+        //bType : int
+        register.setiType(bType);
+        //set regName = ident
+        register.setRegName(ctx.getChild(0).getText());
+        register.setOperationNumber(operationNumber);
+        register.setConst(false);
+        register.setGlobal(false);
+        outputStringBuilder.append(operationNumber + " = alloca " + register.getiType() + System.lineSeparator());
+        //define only name, that is,  ident
+        if (ctx.children.size() == 1){
+            //do nothing
+//            super.visitVarDef(ctx);
+        }
+        // define name and value,that is,  varDef : ident = initVal
+        else if (ctx.children.size() == 3){
+            visit(ctx.initVal());
+            outputStringBuilder.append("store i32 " + operationNumber + ", " + register.getiType() + "* "+ register.getOperationNumber() + System.lineSeparator());
+
+        }
+        //need to store local hashmap
+        registerHashMap_local.put(register.getRegName(),register);
+//        super.visitVarDef(ctx);
+        return null;
     }
 
     @Override
@@ -87,7 +152,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitFuncType(MiniSysParser.FuncTypeContext ctx) {
-        System.out.println("now visit functype. "+ "functype.gettext is " + ctx.getText());
+        System.out.println("now visit functype. "+ "functype.text is " + ctx.getText());
         if(ctx.getText().equals("int")){
             retType = "i32 ";
             outputStringBuilder.append("i32 ");
@@ -107,7 +172,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitBlock(MiniSysParser.BlockContext ctx) {
-        System.out.println("now visit block" + ". block.gettext is " + ctx.getText());
+        System.out.println("now visit block" + ". block.text is " + ctx.getText());
         outputStringBuilder.append("{" + System.lineSeparator());
         initGlobalVariables();
         super.visitBlock(ctx);
@@ -117,21 +182,56 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitBlockItem(MiniSysParser.BlockItemContext ctx) {
-        System.out.println("now visit blockitem");
-        return super.visitBlockItem(ctx);
+        System.out.println("now visit blockitem. blockitem.text is " + ctx.getText());
+        //decl
+        if(ctx.decl() != null){
+            super.visitBlockItem(ctx);
+        }
+        //stmt
+        else if(ctx.stmt() != null){
+            super.visitBlockItem(ctx);
+        }
+        return null;
     }
 
     @Override
     public Object visitStmt(MiniSysParser.StmtContext ctx) {
         System.out.println("now visit stmt. stmt text is : "+ ctx.getText());
-        if(ctx.children.size() == 3){
-            String child0 = String.valueOf(ctx.getChild(0));
-            if(child0.equals("return")){
-                super.visitStmt(ctx);
-                outputStringBuilder.append("ret " + retType + "%"+registerNum);
+        String child0 = ctx.getChild(0).getText();
+        //return exp ;
+        if(child0.equals("return")){
+            super.visitStmt(ctx);
+            outputStringBuilder.append("ret " + retType + "%"+registerNum);
+        }
+        //exp;
+            //i think did nothing
+        //lval = exp;
+        else if (ctx.lVal() != null){
+            String regName = ctx.lVal().getText();
+            //judge whther regName had benn defined and isConst = false
+            Register register = registerHashMap_local.get(regName);
+            if (register != null){
+                //local
+                visit(ctx.exp());
+                if (!register.isConst()){
+                    outputStringBuilder.append("store i32 " + operationNumber + ", " + register.getiType() + "* " + register.getOperationNumber() + System.lineSeparator());
+                }
+                else {
+                    System.out.println("stmt : lval is const");
+                    System.exit(-1);
+                }
+            }
+            else {
+                register = registerHashMap_global.get(regName);
+                if (register != null){
+                    //global
+                }
+                else {
+                    System.out.println("stmt : lval had not been defined");
+                    System.exit(-1);
+                }
             }
         }
-
         return null;
     }
 
@@ -154,9 +254,11 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     @Override
     public Object visitPrimaryExp(MiniSysParser.PrimaryExpContext ctx) {
         System.out.println("now visit primaryexp. primaryexp text is : " + ctx.getText() );
+        //primary : ( exp )
         if(ctx.exp() != null){
             visit(ctx.exp());
         }
+        //primary : number
         else if(ctx.Number() != null){
             int number;
             String numberString = String.valueOf(ctx.Number());
@@ -176,6 +278,28 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 number = Integer.parseInt(numberString);
             }
             operationNumber = String.valueOf(number);
+        }
+        //primary : lval
+        else if (ctx.lVal()!=null){
+            // the lval was in exp
+            //need to judge whether lval had been defined
+            //lval : ident
+            Register register = registerHashMap_local.get(ctx.lVal().getText());
+            if(register != null){
+                registerNum ++;
+                operationNumber = "%" + registerNum;
+                outputStringBuilder.append(operationNumber + " = load i32, " + register.getiType() + "* " + register.getOperationNumber() + System.lineSeparator());
+            }
+            else {
+                register = registerHashMap_global.get(ctx.lVal().getText());
+                if (register != null){
+                    //need to write global register
+                }
+                else {
+                    System.out.println("primary : lval has not been defined");
+                    System.exit(-1);
+                }
+            }
         }
         else {
             super.visitPrimaryExp(ctx);

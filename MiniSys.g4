@@ -60,9 +60,10 @@ lAndExp     :   eqExp
 lOrExp      :   lAndExp
                 | lOrExp '||' lAndExp;
 constExp    :   addExp;
-ident       :   Nondigit
-                | ident Nondigit
+ident       :   nondigit
+                | ident nondigit
                 | ident digit;
+nondigit     :   Nondigit;
 digit       :   Number;
 //number             : decimalconst | octalconst | hexadecimalconst;
 //decimalconst      : nonzerodigit | decimalconst digit;
@@ -77,7 +78,7 @@ digit       :   Number;
 //                      | 'a' | 'b' | 'c' | 'd' | 'e' | 'f'
 //                      | 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 //lexer
-Nondigit    :   [a-zA-Z_]+;
+Nondigit    :   [a-zA-Z_][_a-zA-Z0-9]*;
 Number      :   [1-9][0-9]*           //decimal
                 | '0'                 //0
                 | '0'[0-7]*           //octal

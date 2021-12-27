@@ -1,4 +1,4 @@
-// Generated from MiniSys.g4 by ANTLR 4.9.3
+// Generated from D:/2021compile/compilation-principle\MiniSys.g4 by ANTLR 4.9.2
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
@@ -382,6 +382,18 @@ public class MiniSysBaseListener implements MiniSysListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitIdent(MiniSysParser.IdentContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterNondigit(MiniSysParser.NondigitContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitNondigit(MiniSysParser.NondigitContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

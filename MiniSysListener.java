@@ -1,4 +1,4 @@
-// Generated from MiniSys.g4 by ANTLR 4.9.3
+// Generated from D:/2021compile/compilation-principle\MiniSys.g4 by ANTLR 4.9.2
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
 /**
@@ -316,6 +316,16 @@ public interface MiniSysListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitIdent(MiniSysParser.IdentContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link MiniSysParser#nondigit}.
+	 * @param ctx the parse tree
+	 */
+	void enterNondigit(MiniSysParser.NondigitContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link MiniSysParser#nondigit}.
+	 * @param ctx the parse tree
+	 */
+	void exitNondigit(MiniSysParser.NondigitContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link MiniSysParser#digit}.
 	 * @param ctx the parse tree
