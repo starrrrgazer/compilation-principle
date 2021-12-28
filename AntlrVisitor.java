@@ -9,12 +9,13 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     int registerNum = 0;
     String nowFuncName;
     String operationNumber;
-    HashMap<String, Variable> registerHashMap_local = new HashMap<>(); //register is used to store information about variable
-    HashMap<String, Variable> registerHashMap_global = new HashMap<>();
+    HashMap<String, Variable> variableHashMap_local = new HashMap<>(); //register is used to store information about variable
+    HashMap<String, Variable> variableHashMap_global = new HashMap<>();
     HashMap<String,Function> functionHashMap = new HashMap<>();
     String bType; // when define var, set bType = btype
 
     public StringBuilder getOutputStringBuilder() {
+
         return outputStringBuilder;
     }
 
@@ -117,7 +118,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
         }
         //need to store local hashmap
-        registerHashMap_local.put(variable.getRegName(), variable);
+        variableHashMap_local.put(variable.getRegName(), variable);
 //        super.visitVarDef(ctx);
         return null;
     }
@@ -163,7 +164,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
         }
         //need to store local hashmap
-        registerHashMap_local.put(variable.getRegName(), variable);
+        variableHashMap_local.put(variable.getRegName(), variable);
 //        super.visitVarDef(ctx);
         return null;
     }
@@ -230,7 +231,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         else if (ctx.lVal() != null){
             String regName = ctx.lVal().getText();
             //judge whther regName had benn defined and isConst = false
-            Variable variable = registerHashMap_local.get(regName);
+            Variable variable = variableHashMap_local.get(regName);
             if (variable != null){
                 //local
                 visit(ctx.exp());
@@ -243,7 +244,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 }
             }
             else {
-                variable = registerHashMap_global.get(regName);
+                variable = variableHashMap_global.get(regName);
                 if (variable != null){
                     //global
                 }
@@ -305,14 +306,14 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             // the lval was in exp
             //need to judge whether lval had been defined
             //lval : ident
-            Variable variable = registerHashMap_local.get(ctx.lVal().getText());
+            Variable variable = variableHashMap_local.get(ctx.lVal().getText());
             if(variable != null){
                 registerNum ++;
                 operationNumber = "%" + registerNum;
                 outputStringBuilder.append(operationNumber + " = load i32, " + variable.getiType() + "* " + variable.getOperationNumber() + System.lineSeparator());
             }
             else {
-                variable = registerHashMap_global.get(ctx.lVal().getText());
+                variable = variableHashMap_global.get(ctx.lVal().getText());
                 if (variable != null){
                     //need to write global register
                 }
