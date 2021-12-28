@@ -9,7 +9,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     int registerNum = 0;
     String nowFuncName;
     String operationNumber;
-    HashMap<String, Variable> variableHashMap_local = new HashMap<>(); //register is used to store information about variable
+    HashMap<String, Variable> variableHashMap_local = new HashMap<>(); //is used to store information about variable
     HashMap<String, Variable> variableHashMap_global = new HashMap<>();
     HashMap<String,Function> functionHashMap = new HashMap<>();
     String bType; // when define var, set bType = btype
@@ -225,7 +225,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         }
         //exp;
         else if (ctx.exp() != null){
-            super.visitStmt(ctx);
+//            super.visitStmt(ctx);
         }
         //lval = exp;
         else if (ctx.lVal() != null){
@@ -253,6 +253,9 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                     System.exit(-1);
                 }
             }
+        }
+        else {
+            super.visitStmt(ctx);
         }
         return null;
     }
