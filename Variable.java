@@ -1,4 +1,4 @@
-public class Register {
+public class Variable {
 
     private String operationNumber; // register num
 
@@ -10,9 +10,9 @@ public class Register {
 
     private String iType;// i32 or i1 or i32* ?
 
-    public Register(){}
+    public Variable(){}
 
-    public Register(String number, String regName, boolean isConst, boolean isGlobal, String iType){
+    public Variable(String number, String regName, boolean isConst, boolean isGlobal, String iType){
         this.operationNumber = number;
         this.regName = regName;
         this.isConst = isConst;
