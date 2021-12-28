@@ -29,7 +29,7 @@ public class Register {
             this.iType = "i32";
         }
         else {
-            this.iType = null;
+            this.iType = "i32";
         }
     }
 

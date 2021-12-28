@@ -27,15 +27,37 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         operationNumber = null;
     }
 
+    public void initFunctionMap(){
+        Function function = new Function("i32","getint",false,null,"declare i32 @getint()" );
+        functionHashMap.put("getint",function);
+        Function function2 = new Function("i32","getch",false,null,"declare i32 @getch()");
+        functionHashMap.put("getch",function2);
+        Function function3 = new Function("i32","getarray",false, new String[]{"i32*"},"declare i32 @getarray(i32*)");
+        functionHashMap.put("getarray",function3);
+        Function function4 = new Function("void","putint",false,new String[]{"i32"},"declare void @putint(i32)");
+        functionHashMap.put("putint",function4);
+        Function function5= new Function("void","putch",false,new String[]{"i32"},"declare void @putch(i32)");
+        functionHashMap.put("putch",function5);
+        Function function6 = new Function("void","putarray",false,new String[]{"i32","i32*"},"declare void @putarray(i32,i32*)");
+        functionHashMap.put("putarray",function6);
+    }
+
     @Override
     public Object visitFuncDef(MiniSysParser.FuncDefContext ctx) {
         System.out.println("now visit funcdef");
         outputStringBuilder.append("define dso_local ");
-        visit(ctx.funcType());
-        visit(ctx.ident());
-        outputStringBuilder.append("(");
-        //this should be a visit param
-        outputStringBuilder.append(")");
+        if(ctx.funcType().getText().equals("int")){
+            retType = "i32 ";
+            outputStringBuilder.append("i32 ");
+        }
+//        visit(ctx.funcType());
+//        visit(ctx.ident());
+        if (ctx.ident().getText().equals("main")){
+            outputStringBuilder.append("@main");
+            outputStringBuilder.append("(");
+            //this should be a visit param
+            outputStringBuilder.append(")");
+        }
         visit(ctx.block());
         return null;
     }
@@ -43,6 +65,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     @Override
     public Object visitCompUnit(MiniSysParser.CompUnitContext ctx) {
         System.out.println("now visit compunit");
+        initFunctionMap();
         return super.visitCompUnit(ctx);
     }
 
@@ -153,10 +176,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     @Override
     public Object visitFuncType(MiniSysParser.FuncTypeContext ctx) {
         System.out.println("now visit functype. "+ "functype.text is " + ctx.getText());
-        if(ctx.getText().equals("int")){
-            retType = "i32 ";
-            outputStringBuilder.append("i32 ");
-        }
         return super.visitFuncType(ctx);
     }
 
@@ -201,10 +220,12 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         //return exp ;
         if(child0.equals("return")){
             super.visitStmt(ctx);
-            outputStringBuilder.append("ret " + retType + "%"+registerNum);
+            outputStringBuilder.append("ret " + retType + operationNumber);
         }
         //exp;
-            //i think did nothing
+        else if (ctx.exp() != null){
+            super.visitStmt(ctx);
+        }
         //lval = exp;
         else if (ctx.lVal() != null){
             String regName = ctx.lVal().getText();
@@ -311,17 +332,63 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     @Override
     public Object visitUnaryExp(MiniSysParser.UnaryExpContext ctx) {
         System.out.println("now visit unaryexp");
-        if(ctx.children.size() == 1){
-            //primaryExp
+        //primaryExp
+        if(ctx.primaryExp() != null){
             super.visit(ctx.primaryExp());
         }
-        else if(ctx.children.size() == 2){
-            //unaryOp unaryExp
+        //unaryOp unaryExp
+        else if(ctx.unaryOp() != null){
             visit(ctx.unaryExp());
             if(ctx.unaryOp().getText().equals("-")){
                 registerNum++;
                 outputStringBuilder.append("%" + registerNum + " = sub " + "i32 " + "0" + ", "+operationNumber + System.lineSeparator());
                 operationNumber = "%" + registerNum;
+            }
+        }
+        // ident ( [funcRParams] )
+        else if (ctx.ident() != null){
+            String funcName = ctx.ident().getText();
+            //judge whether function had been defined
+            Function function = functionHashMap.get(funcName);
+            if (function != null){
+                //judge whether params is legal
+                // no paramas: getint getch
+                if(ctx.funcRParams() == null ){
+                    if (function.getParamsType() == null){
+                        //if had not been declared before, declare it
+                        if(function.isDeclare() == false){
+                            function.setDeclare(true);
+                            outputStringBuilder.insert(0,function.getDeclareString() + System.lineSeparator());
+                        }
+                        registerNum ++ ;
+                        operationNumber = "%" + registerNum;
+                        outputStringBuilder.append(operationNumber + " = call " + function.getRetType() + " @" + function.getFuncName() + "()" + System.lineSeparator());
+                    }
+                    else {
+                        System.out.println("function params is not legal");
+                        System.exit(-1);
+                    }
+                }
+                //here dont think about putarray and get array
+                else {
+                    visit(ctx.funcRParams());
+                    boolean paramsLegal = function.checkParamsType("i32");
+                    if (paramsLegal){
+                        if(function.isDeclare() == false){
+                            function.setDeclare(true);
+                            outputStringBuilder.insert(0,function.getDeclareString() + System.lineSeparator());
+                        }
+                        outputStringBuilder.append("call " + function.getRetType() + " @" + function.getFuncName() + "(" + "i32 " + operationNumber +")" + System.lineSeparator());
+                    }
+                    else {
+                        System.out.println("function params is not legal");
+                        System.exit(-1);
+                    }
+                }
+            }
+            else {
+                System.out.println("function had not benn defined");
+                System.exit(-1);
             }
         }
         return null;
@@ -428,7 +495,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     @Override
     public Object visitIdent(MiniSysParser.IdentContext ctx) {
         System.out.println("now visit ident" + ". ident text is : " + ctx.getText());
-        outputStringBuilder.append("@" + ctx.getText());
+//        outputStringBuilder.append("@" + ctx.getText());
         return super.visitIdent(ctx);
     }
 
