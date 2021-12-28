@@ -224,7 +224,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             outputStringBuilder.append("ret " + retType + operationNumber);
         }
         //exp;
-        else if (ctx.exp() != null){
+        else if (ctx.lVal()==null && ctx.exp() != null ){
 //            super.visitStmt(ctx);
         }
         //lval = exp;
