@@ -225,7 +225,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         }
         //exp;
         else if (ctx.lVal()==null && ctx.exp() != null ){
-//            super.visitStmt(ctx);
+            super.visitStmt(ctx);
         }
         //lval = exp;
         else if (ctx.lVal() != null){
