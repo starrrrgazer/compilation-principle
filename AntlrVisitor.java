@@ -8,6 +8,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     String retType;
     int registerNum = 0;
     String nowFuncName;
+    String nowBlockLabel;
     String operationNumber;
     HashMap<String, Variable> variableHashMap_local = new HashMap<>(); //is used to store information about variable
     HashMap<String, Variable> variableHashMap_global = new HashMap<>();
@@ -99,14 +100,20 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitConstDef(MiniSysParser.ConstDefContext ctx) {
-        Variable variable = new Variable();
+
+        Variable variable = variableHashMap_local.get(ctx.ident().getText());
+        if (variable != null){
+            System.out.println("variable " + variable.getVarName() + " had benn defined befor");
+            System.exit(-1);
+        }
+        variable = new Variable();
         registerNum++;
         operationNumber = "%" + registerNum;
 
         //bType : int
         variable.setiType(bType);
         //set regName = ident
-        variable.setRegName(ctx.getChild(0).getText());
+        variable.setVarName(ctx.getChild(0).getText());
         variable.setOperationNumber(operationNumber);
         variable.setConst(true);
         variable.setGlobal(false);
@@ -118,7 +125,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
         }
         //need to store local hashmap
-        variableHashMap_local.put(variable.getRegName(), variable);
+        variableHashMap_local.put(variable.getVarName(), variable);
 //        super.visitVarDef(ctx);
         return null;
     }
@@ -140,17 +147,25 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitVarDef(MiniSysParser.VarDefContext ctx) {
-        Variable variable = new Variable();
+
+        //judge whether variable had been defined
+        Variable variable = variableHashMap_local.get(ctx.ident().getText());
+        if (variable != null){
+            System.out.println("variable " + variable.getVarName() + " had benn defined befor");
+            System.exit(-1);
+        }
+        variable = new Variable();
         registerNum++;
         operationNumber = "%" + registerNum;
 
         //bType : int
         variable.setiType(bType);
         //set regName = ident
-        variable.setRegName(ctx.getChild(0).getText());
+        variable.setVarName(ctx.getChild(0).getText());
         variable.setOperationNumber(operationNumber);
         variable.setConst(false);
         variable.setGlobal(false);
+
         outputStringBuilder.append(operationNumber + " = alloca " + variable.getiType() + System.lineSeparator());
         //define only name, that is,  ident
         if (ctx.children.size() == 1){
@@ -164,7 +179,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
         }
         //need to store local hashmap
-        variableHashMap_local.put(variable.getRegName(), variable);
+        variableHashMap_local.put(variable.getVarName(), variable);
 //        super.visitVarDef(ctx);
         return null;
     }

@@ -2,7 +2,7 @@ public class Variable {
 
     private String operationNumber; // register num
 
-    private String regName;// register ident(name)
+    private String varName;// register ident(name)
 
     private boolean isConst;// whether is const(can not be change)
 
@@ -10,11 +10,13 @@ public class Variable {
 
     private String iType;// i32 or i1 or i32* ?
 
+    private String blockLabel; // the label name
+
     public Variable(){}
 
     public Variable(String number, String regName, boolean isConst, boolean isGlobal, String iType){
         this.operationNumber = number;
-        this.regName = regName;
+        this.varName = regName;
         this.isConst = isConst;
         this.isGlobal = isGlobal;
         this.iType = iType;
@@ -49,12 +51,12 @@ public class Variable {
         this.operationNumber = operationNumber;
     }
 
-    public String getRegName() {
-        return regName;
+    public String getVarName() {
+        return varName;
     }
 
-    public void setRegName(String regName) {
-        this.regName = regName;
+    public void setVarName(String varName) {
+        this.varName = varName;
     }
 
     public boolean isConst() {
@@ -63,5 +65,13 @@ public class Variable {
 
     public void setConst(boolean aConst) {
         isConst = aConst;
+    }
+
+    public String getBlockLabel() {
+        return blockLabel;
+    }
+
+    public void setBlockLabel(String blockLabel) {
+        this.blockLabel = blockLabel;
     }
 }
