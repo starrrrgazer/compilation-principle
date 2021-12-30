@@ -337,6 +337,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             if (blockArrayList.size() > 0 && !haveAndOrCond && !checkAllBlockComplete()){
                 registerNum ++;
                 nowBlockLabel = "%" + registerNum;
+
                 if (blockIncludeIf){
                     backFillBrBlockLabelList(nowBlockLabel,7);
                     blockIncludeIf = false;
