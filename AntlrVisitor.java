@@ -93,6 +93,9 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 insertIndex = insertIndex + str.length();
             }
             else if (block.getBrLabelNum() == 1){
+                if (block.getBrLabel1() == null){
+                    continue;
+                }
                 String str = "br label " + block.getBrLabel1() + System.lineSeparator();
                 outputStringBuilder.insert(block.getInsertIndex() + insertIndex,str);
                 insertIndex = insertIndex + str.length();
@@ -318,7 +321,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             }
             if (ctx.getParent().getChild(0).getText().equals("if")){
                 Block block = new Block();
-
                 block.setInsertIndex(outputStringBuilder.length());
                 block.setBrLabelNum(1);
                 block.setOperationNumber(nowBlockLabel);
@@ -331,25 +333,23 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             //judge whether have || or &&
             boolean haveAndOrCond = ctx.cond().lOrExp().lOrExp() != null || ctx.cond().lOrExp().lAndExp().lAndExp() != null;
             // have || or && , that means cond has create block, don't need to create another
-            if (!haveAndOrCond){
-                if (checkNeedNewBlock()){
-                    registerNum ++;
-                    nowBlockLabel = "%" + registerNum;
-                    backFillBrBlockLabelList(nowBlockLabel,2);
-                }
+            if (blockArrayList.size() > 0 && !haveAndOrCond){
+                registerNum ++;
+                nowBlockLabel = "%" + registerNum;
+                backFillBrBlockLabelList(nowBlockLabel,2);
                 printBlockLabel(registerNum);
             }
+
+
             visit(ctx.cond());
             // have || or && , that means cond has create block, don't need to create another
             if (!haveAndOrCond){
                 String judgeRegister = operationNumber;
-
                 Block block = new Block();
                 block.setInsertIndex(outputStringBuilder.length());
                 block.setJudgeRegister(judgeRegister);
                 block.setBrLabelNum(2);
                 block.setOperationNumber(nowBlockLabel);
-
                 blockArrayList.add(block);
             }
 
@@ -365,11 +365,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
             registerNum++;
             nowBlockLabel = "%" + registerNum;
-            Block block1 = new Block();
-            block1.setBrLabelNum(1);
-            block1.setNeedInsert(true);
-            block1.setOperationNumber(nowBlockLabel);
-            block1.setBrComplete(true);
             //just if need special insert
             if (justIf){
                 backFillBrBlockLabelList(nowBlockLabel,3);
@@ -377,13 +372,13 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             else {
                 backFillBrBlockLabelList(nowBlockLabel,1);
             }
-            printBlockLabel2(registerNum);
+            printBlockLabel(registerNum);
+            Block block1 = new Block();
+            block1.setBrLabelNum(1);
+            block1.setOperationNumber(nowBlockLabel);
             block1.setInsertIndex(outputStringBuilder.length());
-            //if before has block that is not completed,
-            if (checkNeedNewBlock()){
-                block1.setBrComplete(false);
-                blockArrayList.add(block1);
-            }
+            block1.setBrComplete(false);
+            blockArrayList.add(block1);
         }
         //block
         else if (ctx.block() != null){
@@ -422,9 +417,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         }
     }
     public void printBlockLabel(int regNum){
-        if (checkNeedNewBlock()){
-            outputStringBuilder.append(System.lineSeparator() + regNum + ":" + System.lineSeparator());
-        }
+        outputStringBuilder.append(System.lineSeparator() + regNum + ":" + System.lineSeparator());
     }
 
     public void backFillBrBlockLabelList(String blockLabelName, int type){
@@ -872,12 +865,13 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             if (ctx.lAndExp().lAndExp() != null){
                 visit(ctx.lAndExp());
             }
-            if (checkNeedNewBlock()){
+            if (blockArrayList.size() > 0 ){
                 registerNum ++;
                 nowBlockLabel = "%" + registerNum;
                 backFillBrBlockLabelList(nowBlockLabel,4);
+                printBlockLabel(registerNum);
             }
-            printBlockLabel(registerNum);
+
             visit(ctx.lAndExp());
             String judgeRegister = operationNumber;
             Block block = new Block();
@@ -939,19 +933,19 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             if (ctx.lOrExp().lOrExp() != null){
                 visit(ctx.lOrExp());
             }
-            if (checkNeedNewBlock()){
+            if (blockArrayList.size() > 0 ){
                 registerNum ++;
                 nowBlockLabel = "%" + registerNum;
                 backFillBrBlockLabelList(nowBlockLabel,4);
+                printBlockLabel(registerNum);
             }
-            printBlockLabel(registerNum);
+
             visit(ctx.lOrExp());
             //judge if before have &&
             boolean havaAndCondBefore = ctx.lOrExp().lAndExp().children.size() == 3;
             //if have && the eq block had benn created,so don't need to create another
             if (!havaAndCondBefore){
                 String judgeRegister = operationNumber;
-
                 Block block = new Block();
                 block.setJudgeRegister(judgeRegister);
                 block.setInsertIndex(outputStringBuilder.length());
@@ -1003,3 +997,9 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         return super.visitDigit(ctx);
     }
 }
+//            if (checkNeedNewBlock()){
+//                registerNum ++;
+//                nowBlockLabel = "%" + registerNum;
+//                backFillBrBlockLabelList(nowBlockLabel,4);
+//            }
+//            printBlockLabel(registerNum);
