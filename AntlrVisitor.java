@@ -9,7 +9,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     String nowFuncName;
     String nowBlockLabel = "%0";
     String operationNumber = null;
-    boolean blockIncludeIf = false;
     HashMap<String, Variable> variableHashMap_local = new HashMap<>(); //is used to store information about variable
     HashMap<String, Variable> variableHashMap_global = new HashMap<>();
     HashMap<String,Function> functionHashMap = new HashMap<>();
@@ -337,15 +336,11 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             if (blockArrayList.size() > 0 && !haveAndOrCond && !checkAllBlockComplete()){
                 registerNum ++;
                 nowBlockLabel = "%" + registerNum;
-                if (blockIncludeIf){
-                    backFillBrBlockLabelList(nowBlockLabel,7);
-                    blockIncludeIf = false;
-                }
-                else {
-                    backFillBrBlockLabelList(nowBlockLabel,2);
-                }
+                backFillBrBlockLabelList(nowBlockLabel,2);
                 printBlockLabel(registerNum);
             }
+
+
             visit(ctx.cond());
             // have || or && , that means cond has create block, don't need to create another
             if (!haveAndOrCond){
@@ -361,9 +356,12 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             visit(ctx.stmt(0));
             //backfill into lor cond
             backFillBrBlockLabelList(nowBlockLabel,5);
-            backFillBrBlockLabelList("%"+ (registerNum +1),6);
             //just if only can visit stmt0
-            if (!justIf){
+            if (justIf){
+                backFillBrBlockLabelList("%"+ (registerNum +1),6);
+            }
+            else if (!justIf){
+                backFillBrBlockLabelList("%"+ (registerNum +1),6);
                 visit(ctx.stmt(1));
             }
             //out of if-else , so get a new block , don't need to add to list
@@ -394,15 +392,12 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             nowBlockLabel = "%" + registerNum;
             backFillBrBlockLabelList(nowBlockLabel,2);
             printBlockLabel(registerNum);
-            blockIncludeIf = true;
             visit(ctx.block());
             Block block = new Block();
             block.setInsertIndex(outputStringBuilder.length());
             block.setBrLabelNum(1);
             block.setOperationNumber(nowBlockLabel);
             blockArrayList.add(block);
-
-
         }
         else {
             super.visitStmt(ctx);
@@ -586,15 +581,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                     }
                     continue;
                 }
-            }
-        }
-        //backfill to last uncomplete label
-        else if (type == 7){
-            for (int i = blockArrayList.size()-1 ; i>=0 ;i--){
-                Block block = blockArrayList.get(i);
-                block.setBrLabel1(blockLabelName);
-                block.setBrComplete(true);
-                break;
             }
         }
     }
@@ -898,10 +884,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 registerNum ++;
                 nowBlockLabel = "%" + registerNum;
                 backFillBrBlockLabelList(nowBlockLabel,4);
-                if (blockIncludeIf){
-                    backFillBrBlockLabelList(nowBlockLabel,7);
-                    blockIncludeIf = false;
-                }
                 printBlockLabel(registerNum);
             }
 
@@ -970,10 +952,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 registerNum ++;
                 nowBlockLabel = "%" + registerNum;
                 backFillBrBlockLabelList(nowBlockLabel,4);
-                if (blockIncludeIf){
-                    backFillBrBlockLabelList(nowBlockLabel,7);
-                    blockIncludeIf = false;
-                }
                 printBlockLabel(registerNum);
             }
 
