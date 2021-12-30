@@ -81,7 +81,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         int insertIndex = 0;
         for (Block block:blockArrayList){
             if (!block.isBrComplete()){
-                System.out.println("some block had not benn completed");
+                System.out.println("some block had not benn completed : " + block.getOperationNumber());
 //                System.exit(-1);
             }
             if (!block.isNeedInsert()){
@@ -333,7 +333,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             //judge whether have || or &&
             boolean haveAndOrCond = ctx.cond().lOrExp().lOrExp() != null || ctx.cond().lOrExp().lAndExp().lAndExp() != null;
             // have || or && , that means cond has create block, don't need to create another
-            if (blockArrayList.size() > 0 && !haveAndOrCond){
+            if (blockArrayList.size() > 0 && !haveAndOrCond && !checkAllBlockComplete()){
                 registerNum ++;
                 nowBlockLabel = "%" + registerNum;
                 backFillBrBlockLabelList(nowBlockLabel,2);
@@ -357,7 +357,10 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             //backfill into lor cond
             backFillBrBlockLabelList(nowBlockLabel,5);
             //just if only can visit stmt0
-            if (!justIf){
+            if (justIf){
+                backFillBrBlockLabelList("%"+ (registerNum +1),6);
+            }
+            else if (!justIf){
                 backFillBrBlockLabelList("%"+ (registerNum +1),6);
                 visit(ctx.stmt(1));
             }
@@ -377,7 +380,10 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             block1.setBrLabelNum(1);
             block1.setOperationNumber(nowBlockLabel);
             block1.setInsertIndex(outputStringBuilder.length());
-            block1.setBrComplete(false);
+            if (checkAllBlockComplete()){
+                block1.setBrComplete(true);
+                block1.setNeedInsert(false);
+            }
             blockArrayList.add(block1);
         }
         //block
@@ -400,6 +406,15 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     }
 
     //if now don't have block or all block is complete, return false
+    public boolean checkAllBlockComplete(){
+        for (Block block : blockArrayList){
+            if (!block.isBrComplete()){
+                return false;
+            }
+        }
+        return true;
+    }
+
     public boolean checkNeedNewBlock(){
         if (blockArrayList.size() == 0){
             return false;
@@ -865,7 +880,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             if (ctx.lAndExp().lAndExp() != null){
                 visit(ctx.lAndExp());
             }
-            if (blockArrayList.size() > 0 ){
+            if (blockArrayList.size() > 0 && !checkAllBlockComplete()){
                 registerNum ++;
                 nowBlockLabel = "%" + registerNum;
                 backFillBrBlockLabelList(nowBlockLabel,4);
@@ -933,7 +948,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             if (ctx.lOrExp().lOrExp() != null){
                 visit(ctx.lOrExp());
             }
-            if (blockArrayList.size() > 0 ){
+            if (blockArrayList.size() > 0 && !checkAllBlockComplete()){
                 registerNum ++;
                 nowBlockLabel = "%" + registerNum;
                 backFillBrBlockLabelList(nowBlockLabel,4);
