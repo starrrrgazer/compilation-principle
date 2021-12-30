@@ -337,7 +337,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             if (blockArrayList.size() > 0 && !haveAndOrCond && !checkAllBlockComplete()){
                 registerNum ++;
                 nowBlockLabel = "%" + registerNum;
-
                 if (blockIncludeIf){
                     backFillBrBlockLabelList(nowBlockLabel,7);
                     blockIncludeIf = false;
@@ -371,7 +370,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
             registerNum++;
             nowBlockLabel = "%" + registerNum;
-//            if (registerNum == 14)System.exit(-1);
             //just if need special insert
             if (justIf){
                 backFillBrBlockLabelList(nowBlockLabel,3);
@@ -385,8 +383,8 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             block1.setOperationNumber(nowBlockLabel);
             block1.setInsertIndex(outputStringBuilder.length());
             if (checkAllBlockComplete()){
-//                if (registerNum == 13)System.exit(-1);
                 block1.setBrComplete(true);
+                block1.setNeedInsert(false);
             }
             blockArrayList.add(block1);
         }
@@ -396,13 +394,15 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             nowBlockLabel = "%" + registerNum;
             backFillBrBlockLabelList(nowBlockLabel,2);
             printBlockLabel(registerNum);
+            blockIncludeIf = true;
+            visit(ctx.block());
             Block block = new Block();
             block.setInsertIndex(outputStringBuilder.length());
             block.setBrLabelNum(1);
             block.setOperationNumber(nowBlockLabel);
             blockArrayList.add(block);
-            blockIncludeIf = true;
-            visit(ctx.block());
+
+
         }
         else {
             super.visitStmt(ctx);
