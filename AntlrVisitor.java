@@ -839,11 +839,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         //relExp
         if(ctx.children.size() == 1){
             visit(ctx.relExp());
-            if (ctx.relExp().children.size() == 1){
-                registerNum ++;
-                outputStringBuilder.append("%" + registerNum + " = icmp ne i32 " + operationNumber + ", 0" + System.lineSeparator());
-                operationNumber = "%" + registerNum;
-            }
         }
         //eqExp == != relExp
         else if(ctx.children.size() == 3){
@@ -866,6 +861,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         else {
             super.visit(ctx);
         }
+
         return null;
     }
 
@@ -898,6 +894,12 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             backFillBrBlockLabelList(nowBlockLabel,4);
             printBlockLabel(registerNum);
             visit(ctx.eqExp());
+            //when don't have == != >= <= > <
+            if (ctx.eqExp().children.size() == 1 && ctx.eqExp().relExp().children.size() == 1){
+                registerNum ++;
+                outputStringBuilder.append("%" + registerNum + " = icmp ne i32 " + operationNumber + ", 0" + System.lineSeparator());
+                operationNumber = "%" + registerNum;
+            }
             String judgeRegister1 = operationNumber;
             Block block1 = new Block();
             block1.setBrLabelNum(2);
@@ -919,6 +921,12 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         }
         else {
             super.visitLAndExp(ctx);
+            //when don't have == != >= <= > <
+            if (ctx.eqExp().children.size() == 1 && ctx.eqExp().relExp().children.size() == 1){
+                registerNum ++;
+                outputStringBuilder.append("%" + registerNum + " = icmp ne i32 " + operationNumber + ", 0" + System.lineSeparator());
+                operationNumber = "%" + registerNum;
+            }
         }
         return null;
     }
@@ -938,15 +946,20 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             }
             printBlockLabel(registerNum);
             visit(ctx.lOrExp());
-            String judgeRegister = operationNumber;
+            //judge if before have &&
+            boolean havaAndCondBefore = ctx.lOrExp().lAndExp().children.size() == 3;
+            //if have && the eq block had benn created,so don't need to create another
+            if (!havaAndCondBefore){
+                String judgeRegister = operationNumber;
 
-            Block block = new Block();
-            block.setJudgeRegister(judgeRegister);
-            block.setInsertIndex(outputStringBuilder.length());
-            block.setBrLabelNum(2);
-            block.setOperationNumber(nowBlockLabel);
-            block.setLor(true);
-            blockArrayList.add(block);
+                Block block = new Block();
+                block.setJudgeRegister(judgeRegister);
+                block.setInsertIndex(outputStringBuilder.length());
+                block.setBrLabelNum(2);
+                block.setOperationNumber(nowBlockLabel);
+                block.setLor(true);
+                blockArrayList.add(block);
+            }
 
             //just ||
             if (ctx.lAndExp().lAndExp() == null){
