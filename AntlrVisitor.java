@@ -77,7 +77,10 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     }
 
     public void outputListToString(){
+        outputListString = new String();
         for (String s : outputList){
+            if (s == null)
+                continue;
             outputListString += s;
         }
     }
