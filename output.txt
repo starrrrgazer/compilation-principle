@@ -1,4 +1,4 @@
-declare i32 @getint()
+nulldeclare i32 @getint()
 declare i32 @getch()
 declare i32 @getarray(i32*)
 declare void @putint(i32)
@@ -23,7 +23,7 @@ br i1 %10, label %11, label %15
 %13 = sub i32 0, %12
 %14 = sub i32 0, %13
 store i32 %14, i32* %1
-br label %16
+br label %, label %15
 
 15:
 store i32 0, i32* %1

@@ -1,9 +1,11 @@
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Stack;
 
 
 public class AntlrVisitor extends MiniSysBaseVisitor {
-    StringBuilder outputStringBuilder = new StringBuilder();
+    ArrayList<String> outputList = new ArrayList<>();
+    String outputListString;
     String retType;
     int registerNum = 0;//first block = %0
     String nowFuncName;
@@ -12,17 +14,14 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     HashMap<String, Variable> variableHashMap_local = new HashMap<>(); //is used to store information about variable
     HashMap<String, Variable> variableHashMap_global = new HashMap<>();
     HashMap<String,Function> functionHashMap = new HashMap<>();
-    ArrayList<Block> blockArrayList = new ArrayList<>();
     String bType; // when define var, set bType = btype
-
-    public StringBuilder getOutputStringBuilder() {
-        return outputStringBuilder;
-    }
-
-    public void setOutputStringBuilder(StringBuilder outputStringBuilder) {
-        this.outputStringBuilder = outputStringBuilder;
-    }
-
+    boolean isReturn = false ; // judge whether if return
+    Stack<StackElem> callbackStack = new Stack<StackElem>(); // if block callback
+    Stack<Integer> retStack = new Stack<Integer>();// ret index
+//    ListStack<StackElem> callbackStack = new ListStack<StackElem>(); // if block callback
+//    ListStack<Integer> retStack = new ListStack<Integer>();// ret index
+    ArrayList<Block> blockArrayList = new ArrayList<>();
+    ListStack<ArrayList<Block>> blockStack = new ListStack<>();
 
 
     public void initFunctionMap(){
@@ -38,30 +37,30 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         functionHashMap.put("putch",function5);
         Function function6 = new Function("void","putarray",false,new String[]{"i32","i32*"},"declare void @putarray(i32,i32*)");
         functionHashMap.put("putarray",function6);
-        outputStringBuilder.append("declare i32 @getint()" + System.lineSeparator());
-        outputStringBuilder.append("declare i32 @getch()" + System.lineSeparator());
-        outputStringBuilder.append("declare i32 @getarray(i32*)" + System.lineSeparator());
-        outputStringBuilder.append("declare void @putint(i32)" + System.lineSeparator());
-        outputStringBuilder.append("declare void @putch(i32)" + System.lineSeparator());
-        outputStringBuilder.append("declare void @putarray(i32,i32*)" + System.lineSeparator());
+        outputList.add("declare i32 @getint()" + System.lineSeparator());
+        outputList.add("declare i32 @getch()" + System.lineSeparator());
+        outputList.add("declare i32 @getarray(i32*)" + System.lineSeparator());
+        outputList.add("declare void @putint(i32)" + System.lineSeparator());
+        outputList.add("declare void @putch(i32)" + System.lineSeparator());
+        outputList.add("declare void @putarray(i32,i32*)" + System.lineSeparator());
     }
 
     @Override
     public Object visitFuncDef(MiniSysParser.FuncDefContext ctx) {
         System.out.println("now visit funcdef");
-        outputStringBuilder.append("define dso_local ");
+        outputList.add("define dso_local ");
         if (ctx.funcType().getText().equals("int")){
             retType = "i32 ";
-            outputStringBuilder.append("i32 ");
+            outputList.add("i32 ");
         }
         if (ctx.ident().getText().equals("main")){
-            outputStringBuilder.append("@main");
-            outputStringBuilder.append("(");
+            outputList.add("@main");
+            outputList.add("(");
             //this should be a visit param
-            outputStringBuilder.append(")");
-            outputStringBuilder.append(" {" + System.lineSeparator());
+            outputList.add(")");
+            outputList.add(" {" + System.lineSeparator());
             visit(ctx.block());
-            outputStringBuilder.append("}");
+            outputList.add("}");
         }
 
         return null;
@@ -72,34 +71,14 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         System.out.println("now visit compunit");
         initFunctionMap();
         super.visitCompUnit(ctx);
-        outputBrBlockLabel();
+        outputListToString();
         System.out.println("now exit");
         return null;
     }
 
-    public void outputBrBlockLabel(){
-        int insertIndex = 0;
-        for (Block block:blockArrayList){
-            if (!block.isBrComplete()){
-                System.out.println("some block had not benn completed : " + block.getOperationNumber());
-//                System.exit(-1);
-            }
-            if (!block.isNeedInsert()){
-                continue;
-            }
-            if (block.getBrLabelNum() == 2){
-                String str = "br i1 " + block.getJudgeRegister() + ", label " + block.getBrLabel1() + ", label " + block.getBrLabel2() + System.lineSeparator();
-                outputStringBuilder.insert(block.getInsertIndex() + insertIndex,str);
-                insertIndex = insertIndex + str.length();
-            }
-            else if (block.getBrLabelNum() == 1){
-                if (block.getBrLabel1() == null){
-                    continue;
-                }
-                String str = "br label " + block.getBrLabel1() + System.lineSeparator();
-                outputStringBuilder.insert(block.getInsertIndex() + insertIndex,str);
-                insertIndex = insertIndex + str.length();
-            }
+    public void outputListToString(){
+        for (String s : outputList){
+            outputListString += s;
         }
     }
 
@@ -150,11 +129,11 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         variable.setConst(true);
         variable.setGlobal(false);
         variable.setBlockLabel(nowBlockLabel);
-        outputStringBuilder.append(operationNumber + " = alloca " + variable.getiType() + System.lineSeparator());
+        outputList.add(operationNumber + " = alloca " + variable.getiType() + System.lineSeparator());
         // define name and value,that is,  constDef : ident = constInitVal
         if (ctx.children.size() == 3){
             visit(ctx.constInitVal());
-            outputStringBuilder.append("store i32 " + operationNumber + ", " + variable.getiType() + "* "+ variable.getOperationNumber() + System.lineSeparator());
+            outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* "+ variable.getOperationNumber() + System.lineSeparator());
 
         }
         //need to store local hashmap
@@ -199,7 +178,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         variable.setConst(false);
         variable.setGlobal(false);
         variable.setBlockLabel(nowBlockLabel);
-        outputStringBuilder.append(operationNumber + " = alloca " + variable.getiType() + System.lineSeparator());
+        outputList.add(operationNumber + " = alloca " + variable.getiType() + System.lineSeparator());
         //define only name, that is,  ident
         if (ctx.children.size() == 1){
             //do nothing
@@ -208,7 +187,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         // define name and value,that is,  varDef : ident = initVal
         else if (ctx.children.size() == 3){
             visit(ctx.initVal());
-            outputStringBuilder.append("store i32 " + operationNumber + ", " + variable.getiType() + "* "+ variable.getOperationNumber() + System.lineSeparator());
+            outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* "+ variable.getOperationNumber() + System.lineSeparator());
 
         }
         //need to store local hashmap
@@ -268,33 +247,14 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         //return exp ;
         if(child0.equals("return")){
             super.visitStmt(ctx);
-            outputStringBuilder.append("ret " + retType + operationNumber + System.lineSeparator());
+            outputList.add("ret " + retType + operationNumber + System.lineSeparator());
         }
         //exp;
         else if (ctx.lVal()==null && ctx.exp() != null ){
-            if (ctx.getParent().getChild(0).getText().equals("if")){
-                registerNum ++;
-                nowBlockLabel = "%" + registerNum;
-                backFillBrBlockLabelList(nowBlockLabel,2);
-                printBlockLabel(registerNum);
-
-                Block block = new Block();
-                block.setInsertIndex(outputStringBuilder.length());
-                block.setBrLabelNum(1);
-                block.setOperationNumber(nowBlockLabel);
-                blockArrayList.add(block);
-            }
             super.visitStmt(ctx);
         }
         //lval = exp;
         else if (ctx.lVal() != null){
-            if (ctx.getParent().getChild(0).getText().equals("if")){
-                registerNum ++;
-                nowBlockLabel = "%" + registerNum;
-                backFillBrBlockLabelList(nowBlockLabel,2);
-                printBlockLabel(registerNum);
-            }
-
             String regName = ctx.lVal().getText();
             //judge whther regName had benn defined and isConst = false
             Variable variable = variableHashMap_local.get(regName);
@@ -302,7 +262,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 //local
                 visit(ctx.exp());
                 if (!variable.isConst()){
-                    outputStringBuilder.append("store i32 " + operationNumber + ", " + variable.getiType() + "* " + variable.getOperationNumber() + System.lineSeparator());
+                    outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* " + variable.getOperationNumber() + System.lineSeparator());
                 }
                 else {
                     System.out.println("stmt : lval is const");
@@ -319,85 +279,85 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                     System.exit(-1);
                 }
             }
-            if (ctx.getParent().getChild(0).getText().equals("if")){
-                Block block = new Block();
-                block.setInsertIndex(outputStringBuilder.length());
-                block.setBrLabelNum(1);
-                block.setOperationNumber(nowBlockLabel);
-                blockArrayList.add(block);
-            }
         }
         // if ( cond ) stmt else stmt
         else if (child0.equals("if")){
             boolean justIf = ctx.children.size() == 5;
-            //judge whether have || or &&
-            boolean haveAndOrCond = ctx.cond().lOrExp().lOrExp() != null || ctx.cond().lOrExp().lAndExp().lAndExp() != null;
-            // have || or && , that means cond has create block, don't need to create another
-            if (blockArrayList.size() > 0 && !haveAndOrCond && !checkAllBlockComplete()){
-                registerNum ++;
-                nowBlockLabel = "%" + registerNum;
-                backFillBrBlockLabelList(nowBlockLabel,2);
-                printBlockLabel(registerNum);
-            }
-
-
+            StackElem stackElem1 = new StackElem();
+            callbackStack.push(stackElem1);
+            retStack.push(callbackStack.size()-1);
             visit(ctx.cond());
-            // have || or && , that means cond has create block, don't need to create another
-            if (!haveAndOrCond){
-                String judgeRegister = operationNumber;
-                Block block = new Block();
-                block.setInsertIndex(outputStringBuilder.length());
-                block.setJudgeRegister(judgeRegister);
-                block.setBrLabelNum(2);
-                block.setOperationNumber(nowBlockLabel);
-                blockArrayList.add(block);
-            }
-
-            visit(ctx.stmt(0));
-            //backfill into lor cond
-            backFillBrBlockLabelList(nowBlockLabel,5);
-            //just if only can visit stmt0
-            if (justIf){
-                backFillBrBlockLabelList("%"+ (registerNum +1),6);
-            }
-            else if (!justIf){
-                backFillBrBlockLabelList("%"+ (registerNum +1),6);
-                visit(ctx.stmt(1));
-            }
-            //out of if-else , so get a new block , don't need to add to list
-
             registerNum++;
-            nowBlockLabel = "%" + registerNum;
-            //just if need special insert
+            operationNumber = "%" + registerNum;
+            outputList.add(System.lineSeparator() + registerNum + ":" + System.lineSeparator());
+            StackElem stackElemTmp = callbackStack.pop();
+            for (Integer index : stackElemTmp.getLocation()){
+                if (outputList.get(index).contains("label1")){
+                    outputList.set(index,outputList.get(index).replaceFirst("label1","%" + registerNum));
+                }
+                else {
+                    outputList.set(index,outputList.get(index).substring(0,outputList.get(index).length())+ ", label %" + registerNum);
+                }
+            }
+            isReturn = false;
+            visit(ctx.stmt(0));
+            isReturn = false;
+            outputList.add("br label %");
+            int retIndex = retStack.pop();
+            StackElem stackElem2 = callbackStack.get(retIndex);
+            stackElem2.getLocation().add(outputList.size()-1);
+            callbackStack.set(retIndex,stackElem2);
+            //just if go out
             if (justIf){
-                backFillBrBlockLabelList(nowBlockLabel,3);
+                registerNum++;
+                operationNumber = "%" + registerNum;
+                outputList.add(System.lineSeparator() + registerNum + ":" + System.lineSeparator());
+                stackElemTmp = callbackStack.pop();
+                for (Integer index : stackElemTmp.getLocation()){
+                    outputList.set(index, outputList.get(index) + ", label %" + registerNum + System.lineSeparator());
+                }
+                registerNum++;
+                operationNumber = "%" + registerNum;
+                outputList.add("br label %" + registerNum + System.lineSeparator());
+                stackElemTmp = callbackStack.pop();
+                for (Integer index : stackElemTmp.getLocation()){
+                    outputList.set(index, outputList.get(index).substring(0 , outputList.get(index).length() ) + registerNum + System.lineSeparator());
+                }
+                outputList.add(System.lineSeparator() + registerNum + ":"+ System.lineSeparator());
             }
+            // if else need to visit else
             else {
-                backFillBrBlockLabelList(nowBlockLabel,1);
+                registerNum++;
+                operationNumber = "%" + registerNum;
+                outputList.add(System.lineSeparator() + registerNum + ":"+ System.lineSeparator());
+                stackElemTmp = callbackStack.pop();
+                for (Integer index : stackElemTmp.getLocation()){
+                    outputList.set(index, outputList.get(index) + ", label %" + registerNum + System.lineSeparator());
+                }
+
+                isReturn = false;
+                visit(ctx.stmt(1));
+
+                registerNum++;
+                operationNumber = "%" + registerNum;
+                outputList.add("br label %" + registerNum + System.lineSeparator());
+
+                System.out.println(callbackStack.size());
+
+                stackElemTmp = callbackStack.pop();
+                for (Integer index : stackElemTmp.getLocation()){
+                    outputList.set(index, outputList.get(index).substring(0 , outputList.get(index).length() ) + registerNum + System.lineSeparator());
+                }
+                outputList.add(System.lineSeparator() + registerNum + ":"+ System.lineSeparator());
+                if (isReturn){
+                    outputList.add("br label %" + registerNum + System.lineSeparator());
+                    isReturn = false;
+                }
             }
-            printBlockLabel(registerNum);
-            Block block1 = new Block();
-            block1.setBrLabelNum(1);
-            block1.setOperationNumber(nowBlockLabel);
-            block1.setInsertIndex(outputStringBuilder.length());
-            if (checkAllBlockComplete()){
-                block1.setBrComplete(true);
-                block1.setNeedInsert(false);
-            }
-            blockArrayList.add(block1);
         }
         //block
         else if (ctx.block() != null){
-            registerNum ++;
-            nowBlockLabel = "%" + registerNum;
-            backFillBrBlockLabelList(nowBlockLabel,2);
-            printBlockLabel(registerNum);
             visit(ctx.block());
-            Block block = new Block();
-            block.setInsertIndex(outputStringBuilder.length());
-            block.setBrLabelNum(1);
-            block.setOperationNumber(nowBlockLabel);
-            blockArrayList.add(block);
         }
         else {
             super.visitStmt(ctx);
@@ -405,6 +365,28 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         return null;
     }
 
+    public void popAndBackFillLabel1(String brLabel){
+        ArrayList<Block> blocks = blockStack.pop();
+        for (Block block:blocks){
+            block.setBrLabel1(brLabel);
+        }
+    }
+    public void popAndBackFillLabel2(String brLabel){
+        ArrayList<Block> blocks = blockStack.pop();
+        for (Block block:blocks){
+            block.setBrLabel2(brLabel);
+        }
+    }
+    public Block getNewBlock(int brLabelNum){
+        registerNum ++ ;
+        nowBlockLabel = "%" + registerNum;
+        printBlockLabel(registerNum);
+        Block block = new Block();
+        block.setBrLabelNum(brLabelNum);
+        block.setOperationNumber(nowBlockLabel);
+        blockArrayList.add(block);
+        return block;
+    }
     //if now don't have block or all block is complete, return false
     public boolean checkAllBlockComplete(){
         for (Block block : blockArrayList){
@@ -428,164 +410,12 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     }
     public void printBlockLabel2(int regNum){
         if (blockArrayList.size()>0 || checkNeedNewBlock()){
-            outputStringBuilder.append(System.lineSeparator() + regNum + ":" + System.lineSeparator());
+            outputList.add(System.lineSeparator() + regNum + ":" + System.lineSeparator());
         }
     }
     public void printBlockLabel(int regNum){
-        outputStringBuilder.append(System.lineSeparator() + regNum + ":" + System.lineSeparator());
+        outputList.add(System.lineSeparator() + regNum + ":" + System.lineSeparator());
     }
-
-    public void backFillBrBlockLabelList(String blockLabelName, int type){
-        //insert into 1 brLabelNum = 2
-        if (type == 2){
-            for(Block block : blockArrayList){
-                if(block.isBrComplete()){
-                    continue;
-                }
-                if (block.getBrLabelNum() == 2){
-                    if (block.getBrLabel1() == null){
-                        block.setBrLabel1(blockLabelName);
-                        if (block.getBrLabel2() != null){
-                            block.setBrComplete(true);
-                        }
-                        break;
-                    }
-                    else if (block.getBrLabel2() == null){
-                        block.setBrLabel2(blockLabelName);
-                        if (block.getBrLabel1() != null){
-                            block.setBrComplete(true);
-                        }
-                        break;
-                    }
-                    else {
-                        System.out.println("block back fill wrong. block is not complete but brLabel 1 and 2 was filled");
-                        System.exit(-1);
-                    }
-                }
-            }
-        }
-        //insert into 2  brLabelNum = 1
-        else if (type == 1){
-            int num = 2 ;
-            for(int i = blockArrayList.size()-1; i>=0;i--){
-                Block block = blockArrayList.get(i);
-                if(block.isBrComplete()){
-                    continue;
-                }
-                if (block.getBrLabelNum() == 1){
-                    if (block.getBrLabel1() == null){
-                        block.setBrLabel1(blockLabelName);
-                        block.setBrComplete(true);
-                        num --;
-                        if (num == 0){
-                            break;
-                        }
-                    }
-                    else {
-                        System.out.println("block back fill wrong. block is not complete but brLabel 1 was filled");
-                        System.exit(-1);
-                    }
-                }
-            }
-        }
-        // at the end of only if
-        else if (type == 3){
-            int num = 2 ;
-            for(int i = blockArrayList.size()-1; i>=0;i--){
-                Block block = blockArrayList.get(i);
-                if(block.isBrComplete()){
-                    continue;
-                }
-                if (block.getBrLabelNum() == 1){
-                    if (block.getBrLabel1() == null){
-                        block.setBrLabel1(blockLabelName);
-                        block.setBrComplete(true);
-                        num --;
-                        if (num == 0){
-                            break;
-                        }
-                    }
-                    else {
-                        System.out.println("block back fill wrong. block is not complete but brLabel 1 was filled");
-                        System.exit(-1);
-                    }
-                }
-                else if (block.getBrLabelNum() == 2){
-                    if (block.getBrLabel2() == null){
-                        block.setBrLabel2(blockLabelName);
-                        block.setBrComplete(true);
-                        num --;
-                        if (num == 0){
-                            break;
-                        }
-                    }
-                    else {
-                        System.out.println("block back fill wrong. block is not complete but brLabel 2 was filled");
-                        System.exit(-1);
-                    }
-                }
-            }
-        }
-        //lor or land called : insert into lor's brLabel2
-        //land called : insert into land's brLabel1
-        else if (type == 4){
-            for (Block block:blockArrayList){
-                if (block.isBrComplete()){
-                    continue;
-                }
-                if (block.isLor() && block.getBrLabel2() == null){
-                    block.setBrLabel2(blockLabelName);
-                    if (block.getBrLabel1() != null){
-                        block.setBrComplete(true);
-                    }
-                    break;
-                }
-                if (block.isLAnd() && block.getBrLabel1() == null){
-                    block.setBrLabel1(blockLabelName);
-                    if (block.getBrLabel2() != null){
-                        block.setBrComplete(true);
-                    }
-                    break;
-                }
-            }
-        }
-        //backfill lor cond
-        else if (type == 5){
-            for (Block block : blockArrayList){
-                if (block.isBrComplete()){
-                    continue;
-                }
-                if (block.isLor()){
-                    if (block.getBrLabel1() == null){
-                        block.setBrLabel1(blockLabelName);
-                    }
-                    if (block.getBrLabel2() != null){
-                        block.setBrComplete(true);
-                    }
-                    continue;
-                }
-            }
-        }
-        //backfill land cond
-        else if (type == 6){
-            for (Block block : blockArrayList){
-                if (block.isBrComplete()){
-                    continue;
-                }
-                if (block.isLAnd()){
-                    if (block.getBrLabel2() == null){
-                        block.setBrLabel2(blockLabelName);
-                    }
-                    if (block.getBrLabel1() != null){
-                        block.setBrComplete(true);
-                    }
-                    continue;
-                }
-            }
-        }
-    }
-
-
     @Override
     public Object visitExp(MiniSysParser.ExpContext ctx) {
         System.out.println("now visit exp");
@@ -639,7 +469,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             if(variable != null){
                 registerNum ++;
                 operationNumber = "%" + registerNum;
-                outputStringBuilder.append(operationNumber + " = load i32, " + variable.getiType() + "* " + variable.getOperationNumber() + System.lineSeparator());
+                outputList.add(operationNumber + " = load i32, " + variable.getiType() + "* " + variable.getOperationNumber() + System.lineSeparator());
             }
             else {
                 variable = variableHashMap_global.get(ctx.lVal().getText());
@@ -671,16 +501,16 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             visit(ctx.unaryExp());
             if(ctx.unaryOp().getText().equals("-")){
                 registerNum++;
-                outputStringBuilder.append("%" + registerNum + " = sub " + "i32 " + "0" + ", "+operationNumber + System.lineSeparator());
+                outputList.add("%" + registerNum + " = sub " + "i32 " + "0" + ", "+operationNumber + System.lineSeparator());
                 operationNumber = "%" + registerNum;
             }
             //need update
             else if (ctx.unaryOp().getText().equals("!")){
                 registerNum++;
-                outputStringBuilder.append("%" + registerNum + " = icmp eq i32 " + operationNumber + ", 0" + System.lineSeparator());
+                outputList.add("%" + registerNum + " = icmp eq i32 " + operationNumber + ", 0" + System.lineSeparator());
                 operationNumber = "%" + registerNum;
                 registerNum++;
-                outputStringBuilder.append("%" + registerNum + " = zext i1 " + operationNumber + " to i32" + System.lineSeparator());
+                outputList.add("%" + registerNum + " = zext i1 " + operationNumber + " to i32" + System.lineSeparator());
                 operationNumber = "%" + registerNum;
             }
         }
@@ -700,7 +530,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                         }
                         registerNum ++ ;
                         operationNumber = "%" + registerNum;
-                        outputStringBuilder.append(operationNumber + " = call " + function.getRetType() + " @" + function.getFuncName() + "()" + System.lineSeparator());
+                        outputList.add(operationNumber + " = call " + function.getRetType() + " @" + function.getFuncName() + "()" + System.lineSeparator());
                     }
                     else {
                         System.out.println("function params is not legal");
@@ -715,7 +545,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                         if(function.isDeclare() == false){
                             function.setDeclare(true);
                         }
-                        outputStringBuilder.append("call " + function.getRetType() + " @" + function.getFuncName() + "(" + "i32 " + operationNumber +")" + System.lineSeparator());
+                        outputList.add("call " + function.getRetType() + " @" + function.getFuncName() + "(" + "i32 " + operationNumber +")" + System.lineSeparator());
                     }
                     else {
                         System.out.println("function params is not legal");
@@ -759,13 +589,13 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             String op = String.valueOf(ctx.getChild(1));
             registerNum++;
             if(op.equals("*")){
-                outputStringBuilder.append("%" + registerNum + " = mul " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+                outputList.add("%" + registerNum + " = mul " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
             }
             else if(op.equals("/")){
-                outputStringBuilder.append("%" + registerNum + " = sdiv " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+                outputList.add("%" + registerNum + " = sdiv " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
             }
             else if(op.equals("%")){
-                outputStringBuilder.append("%" + registerNum + " = srem " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+                outputList.add("%" + registerNum + " = srem " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
             }
             operationNumber = "%" + registerNum;
         }
@@ -791,10 +621,10 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             String op = String.valueOf(ctx.getChild(1));
             registerNum++;
             if(op.equals("+")){
-                outputStringBuilder.append("%" + registerNum + " = add " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+                outputList.add("%" + registerNum + " = add " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
             }
             else if(op.equals("-")){
-                outputStringBuilder.append("%" + registerNum + " = sub " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+                outputList.add("%" + registerNum + " = sub " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
             }
             operationNumber = "%" + registerNum;
         }
@@ -823,16 +653,16 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             registerNum++;
             operationNumber = "%" + registerNum;
             if(op.equals("<")){
-                outputStringBuilder.append(operationNumber + " = icmp slt " + "i32 " +  register1 + ", "+ register2 + System.lineSeparator());
+                outputList.add(operationNumber + " = icmp slt " + "i32 " +  register1 + ", "+ register2 + System.lineSeparator());
             }
             else if(op.equals(">")){
-                outputStringBuilder.append(operationNumber + " = icmp sgt " + "i32 " +  register1 + ", "+ register2 + System.lineSeparator());
+                outputList.add(operationNumber + " = icmp sgt " + "i32 " +  register1 + ", "+ register2 + System.lineSeparator());
             }
             else if(op.equals("<=")){
-                outputStringBuilder.append(operationNumber + " = icmp sle " + "i32 " +  register1 + ", "+ register2 + System.lineSeparator());
+                outputList.add(operationNumber + " = icmp sle " + "i32 " +  register1 + ", "+ register2 + System.lineSeparator());
             }
             else if(op.equals(">=")){
-                outputStringBuilder.append(operationNumber + " = icmp sge " + "i32 " +  register1 + ", "+ register2 + System.lineSeparator());
+                outputList.add(operationNumber + " = icmp sge " + "i32 " +  register1 + ", "+ register2 + System.lineSeparator());
             }
         }
         else {
@@ -860,10 +690,10 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             registerNum++;
             operationNumber = "%" + registerNum;
             if(op.equals("==")){
-                outputStringBuilder.append(operationNumber + " = icmp eq " + "i32 " +  register1 + ", " + register2 + System.lineSeparator());
+                outputList.add(operationNumber + " = icmp eq " + "i32 " +  register1 + ", " + register2 + System.lineSeparator());
             }
             else if(op.equals("!=")){
-                outputStringBuilder.append(operationNumber + " = icmp ne " + "i32 " +  register1 + ", " + register2 + System.lineSeparator());
+                outputList.add(operationNumber + " = icmp ne " + "i32 " +  register1 + ", " + register2 + System.lineSeparator());
             }
         }
         else {
@@ -877,65 +707,54 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     public Object visitLAndExp(MiniSysParser.LAndExpContext ctx) {
         //land && eq
         if (ctx.lAndExp() != null){
-            if (ctx.lAndExp().lAndExp() != null){
-                visit(ctx.lAndExp());
-            }
-            if (blockArrayList.size() > 0 && !checkAllBlockComplete()){
-                registerNum ++;
-                nowBlockLabel = "%" + registerNum;
-                backFillBrBlockLabelList(nowBlockLabel,4);
-                printBlockLabel(registerNum);
-            }
-
             visit(ctx.lAndExp());
-            String judgeRegister = operationNumber;
-            Block block = new Block();
-            block.setJudgeRegister(judgeRegister);
-            block.setInsertIndex(outputStringBuilder.length());
-            block.setBrLabelNum(2);
-            block.setOperationNumber(nowBlockLabel);
-
-            block.setLAnd(true);
-            blockArrayList.add(block);
-
-            registerNum ++;
-            nowBlockLabel = "%" + registerNum;
-            backFillBrBlockLabelList(nowBlockLabel,4);
-            printBlockLabel(registerNum);
+            registerNum ++ ;
+            operationNumber = "%" + registerNum;
+            outputList.add(System.lineSeparator() + registerNum + ":" + System.lineSeparator());
+            StackElem stackElemTmp = callbackStack.pop();
+            for (Integer index : stackElemTmp.getLocation()){
+                if (outputList.get(index).contains("label1")){
+                    outputList.set(index, outputList.get(index).replaceFirst("label1", "%" + registerNum));
+                }
+                else {
+                    outputList.set(index,outputList.get(index).substring(0,outputList.get(index).length()) + ", label %" + registerNum);
+                }
+            }
+            visit(ctx.eqExp());
+            if (ctx.eqExp().children.size() == 1 && ctx.eqExp().relExp().children.size() == 1){
+                registerNum ++;
+                outputList.add("%" + registerNum + " = icmp ne i32 " + operationNumber + ", 0" + System.lineSeparator());
+                operationNumber = "%" + registerNum;
+            }
+            outputList.add("br i1 " + operationNumber);
+            int lastIndex = outputList.size() -1 ;
+            stackElemTmp = callbackStack.pop();
+            stackElemTmp.getLocation().add(lastIndex);
+            callbackStack.push(stackElemTmp);
+            stackElemTmp = new StackElem();
+            stackElemTmp.getLocation().add(lastIndex);
+            callbackStack.push(stackElemTmp);
+        }
+        else {
             visit(ctx.eqExp());
             //when don't have == != >= <= > <
             if (ctx.eqExp().children.size() == 1 && ctx.eqExp().relExp().children.size() == 1){
                 registerNum ++;
-                outputStringBuilder.append("%" + registerNum + " = icmp ne i32 " + operationNumber + ", 0" + System.lineSeparator());
+                outputList.add("%" + registerNum + " = icmp ne i32 " + operationNumber + ", 0" + System.lineSeparator());
                 operationNumber = "%" + registerNum;
             }
-            String judgeRegister1 = operationNumber;
-            Block block1 = new Block();
-            block1.setBrLabelNum(2);
-            block1.setNeedInsert(true);
-            block1.setOperationNumber(nowBlockLabel);
-            block1.setBrComplete(false);
-            //it means eq is the last condition of cond
-            if (ctx.getParent().getClass().getSimpleName().equals("LOrExpContext")){
-                block1.setLor(true);
-            }
-            else {
-                block1.setLAnd(true);
-            }
-            block1.setJudgeRegister(judgeRegister1);
-            block1.setInsertIndex(outputStringBuilder.length());
-            blockArrayList.add(block1);
+            StackElem stackElemTmp = new StackElem();
+            outputList.add("br i1 " + operationNumber);
+            int lastIndex = outputList.size() -1 ;
+            stackElemTmp = new StackElem();
+            stackElemTmp.getLocation().add(lastIndex);
 
-
-        }
-        else {
-            super.visitLAndExp(ctx);
-            //when don't have == != >= <= > <
-            if (ctx.eqExp().children.size() == 1 && ctx.eqExp().relExp().children.size() == 1){
-                registerNum ++;
-                outputStringBuilder.append("%" + registerNum + " = icmp ne i32 " + operationNumber + ", 0" + System.lineSeparator());
-                operationNumber = "%" + registerNum;
-            }
+            callbackStack.push(stackElemTmp);
+            System.out.println(callbackStack.size());
+            stackElemTmp = new StackElem();
+            stackElemTmp.getLocation().add(lastIndex);
+            callbackStack.push(stackElemTmp);
+            System.out.println(callbackStack.size());
         }
         return null;
     }
@@ -945,50 +764,24 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         // lor || land
         //
         if (ctx.lOrExp() != null){
-            if (ctx.lOrExp().lOrExp() != null){
-                visit(ctx.lOrExp());
-            }
-            if (blockArrayList.size() > 0 && !checkAllBlockComplete()){
-                registerNum ++;
-                nowBlockLabel = "%" + registerNum;
-                backFillBrBlockLabelList(nowBlockLabel,4);
-                printBlockLabel(registerNum);
-            }
-
             visit(ctx.lOrExp());
-            //judge if before have &&
-            boolean havaAndCondBefore = ctx.lOrExp().lAndExp().children.size() == 3;
-            //if have && the eq block had benn created,so don't need to create another
-            if (!havaAndCondBefore){
-                String judgeRegister = operationNumber;
-                Block block = new Block();
-                block.setJudgeRegister(judgeRegister);
-                block.setInsertIndex(outputStringBuilder.length());
-                block.setBrLabelNum(2);
-                block.setOperationNumber(nowBlockLabel);
-                block.setLor(true);
-                blockArrayList.add(block);
+            registerNum ++;
+            outputList.add(System.lineSeparator() + registerNum + ":" + System.lineSeparator());
+            StackElem stackElemTmp = callbackStack.pop();
+            StackElem stackElemTmp2 = callbackStack.pop();
+            for (Integer index : stackElemTmp2.getLocation()){
+                if (outputList.get(index).length() <= 16){
+                    outputList.set(index, outputList.get(index).substring(0,outputList.get(index).length()) + ", label label1, label %" + registerNum);
+                }
+                else {
+                    outputList.set(index,outputList.get(index) + ",label %" + registerNum);
+                }
             }
 
-            //just ||
-            if (ctx.lAndExp().lAndExp() == null){
-                registerNum ++;
-                nowBlockLabel = "%" + registerNum;
-                backFillBrBlockLabelList(nowBlockLabel,4);
-                printBlockLabel(registerNum);
-                visit(ctx.lAndExp());
-                String judgeRegister1 = operationNumber;
-                Block block1 = new Block();
-                block1.setBrLabelNum(2);
-                block1.setOperationNumber(nowBlockLabel);
-                block1.setLor(true);
-                block1.setJudgeRegister(judgeRegister1);
-                block1.setInsertIndex(outputStringBuilder.length());
-                blockArrayList.add(block1);
-            }
-            else{
-                visit(ctx.lAndExp());
-            }
+            visit(ctx.lAndExp());
+            StackElem stackElemTmp3 = callbackStack.pop();
+            stackElemTmp3.getLocation().addAll(stackElemTmp.getLocation());
+            callbackStack.push(stackElemTmp3);
         }
         else {
             super.visitLOrExp(ctx);
@@ -1012,9 +805,3 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         return super.visitDigit(ctx);
     }
 }
-//            if (checkNeedNewBlock()){
-//                registerNum ++;
-//                nowBlockLabel = "%" + registerNum;
-//                backFillBrBlockLabelList(nowBlockLabel,4);
-//            }
-//            printBlockLabel(registerNum);
