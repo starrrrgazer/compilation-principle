@@ -8,11 +8,13 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     String outputListString;
     String retType;
     int registerNum = 0;//first block = %0
+    int blockNum = -1;//
+    int nowBlock = -1;
     String nowFuncName;
-    String nowBlockLabel = "%0";
     String operationNumber = null;
-    HashMap<String, Variable> variableHashMap_local = new HashMap<>(); //is used to store information about variable
-    HashMap<String, Variable> variableHashMap_global = new HashMap<>();
+    //don't need anymore, variables are stored into blockArrayList
+//    HashMap<String, Variable> variableHashMap_local = new HashMap<>(); //is used to store information about variable
+    HashMap<String, Variable> variableHashMap_global = new HashMap<>(); // belong to block -1
     HashMap<String,Function> functionHashMap = new HashMap<>();
     String bType; // when define var, set bType = btype
     boolean isReturn = false ; // judge whether if return
@@ -20,9 +22,10 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     Stack<Integer> retStack = new Stack<Integer>();// ret index
 //    ListStack<StackElem> callbackStack = new ListStack<StackElem>(); // if block callback
 //    ListStack<Integer> retStack = new ListStack<Integer>();// ret index
+//    ListStack<ArrayList<Block>> blockStack = new ListStack<>();
     ArrayList<Block> blockArrayList = new ArrayList<>();
-    ListStack<ArrayList<Block>> blockStack = new ListStack<>();
-
+    ArrayList<String> globalDeclareList = new ArrayList<>();
+    boolean defineGlobalVariable = true;
 
     public void initFunctionMap(){
         Function function = new Function("i32","getint",false,null,"declare i32 @getint()" );
@@ -66,21 +69,104 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         return null;
     }
 
+    public void initAllGlobalVariables(){
+        System.out.println(outputList);
+        outputList = new ArrayList<>();
+        registerNum = 0;
+        nowFuncName = new String();
+        operationNumber = null;
+        isReturn = false ; // judge whether if return
+        callbackStack = new Stack<StackElem>(); // if block callback
+        retStack = new Stack<Integer>();// ret index
+    }
+
+    public int computeGlobalVariableValue(){
+        System.out.println(outputList);
+        int[] value = new int[9999];
+        int finalValue = 0;
+        for (int i = 0;i<outputList.size();i++){
+            String[] arr = outputList.get(i).split("\\s+");
+            System.out.println(arr[5]);
+            int regNum = Integer.parseInt(arr[0].substring(1));
+            String op = arr[2];
+            String number1 = arr[4];
+            String number2 = arr[5];
+            int num1 = 0;
+            int num2 = 0;
+            if (number1.charAt(0) == '%' && number2.charAt(0) == '%'){
+                num1 = value[Integer.parseInt(number1.substring(1,number1.length()-1))];
+                num2 = value[Integer.parseInt(number2.substring(1))];
+            }
+            else if (number1.charAt(0) == '%' && number2.charAt(0) != '%'){
+                num1 = value[Integer.parseInt(number1.substring(1,number1.length()-1))];
+                num2 = Integer.parseInt(number2);
+            }
+            else if (number1.charAt(0) != '%' && number2.charAt(0) == '%'){
+                num1 = Integer.parseInt(number1.substring(0,number1.length()-1));
+                num2 = value[Integer.parseInt(number2.substring(1))];
+            }
+            else {
+                num1 = Integer.parseInt(number1.substring(0,number1.length()-1));
+                num2 = Integer.parseInt(number2);
+            }
+            if (op.equals("add")){
+                value[regNum] = num1 + num2;
+            }
+            else if (op.equals("mul")){
+                value[regNum] = num1 * num2;
+            }
+            else if (op.equals("sub")){
+                value[regNum] = num1 - num2;
+            }
+            else if (op.equals("sdiv")){
+                value[regNum] = num1 / num2;
+            }
+            else if (op.equals("srem")){
+                value[regNum] = num1 % num2;
+            }
+            if (i == outputList.size()-1){
+                finalValue = value[regNum];
+            }
+        }
+        outputList.clear();
+        return finalValue;
+    }
     @Override
     public Object visitCompUnit(MiniSysParser.CompUnitContext ctx) {
         System.out.println("now visit compunit");
-        initFunctionMap();
-        super.visitCompUnit(ctx);
-        outputListToString();
-        System.out.println("now exit");
+        //first compunit
+        if (ctx.getParent() == null){
+            defineGlobalVariable = true;
+            if (ctx.compUnit() != null){
+                visit(ctx.compUnit());
+            }
+            defineGlobalVariable = false;
+            initAllGlobalVariables();
+            initFunctionMap();
+            if (ctx.funcDef() != null){
+                visit(ctx.funcDef());
+            }
+            if (ctx.decl() != null){
+                visit(ctx.decl());
+            }
+
+            outputListToString();
+            System.out.println("now exit");
+        }
+        else {
+            super.visitCompUnit(ctx);
+        }
+        //exit
+
         return null;
     }
 
     public void outputListToString(){
         outputListString = new String();
+        for (String s : globalDeclareList){
+            outputListString += s;
+        }
         for (String s : outputList){
-            if (s == null)
-                continue;
             outputListString += s;
         }
     }
@@ -112,36 +198,63 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         return super.visitBType(ctx);
     }
 
+
+
     @Override
     public Object visitConstDef(MiniSysParser.ConstDefContext ctx) {
-
-        Variable variable = variableHashMap_local.get(ctx.ident().getText());
-        if (variable != null && variable.getBlockLabel().equals(nowBlockLabel)){
-            System.out.println("variable " + variable.getVarName() + " had benn defined befor");
-            System.exit(-1);
+        if (defineGlobalVariable){
+            Variable variable = variableHashMap_global.get(ctx.ident().getText());
+            if (variable != null){
+                System.out.println("global variable " + variable.getVarName() + " had benn defined before");
+                System.exit(-1);
+            }
+            variable = new Variable();
+            variable.setiType(bType);
+            variable.setVarName(ctx.ident().getText());
+            variable.setOperationNumber(operationNumber);
+            variable.setConst(true);
+            variable.setGlobal(true);
+            variable.setBlock(-1);
+            if (ctx.constInitVal() != null){
+                visit(ctx.constInitVal());
+                if (operationNumber.charAt(0) == '%'){
+                    variable.setValue(computeGlobalVariableValue());
+                }
+                else{
+                    variable.setValue(Integer.parseInt(operationNumber));
+                }
+            }
+            else {
+                variable.setValue(0);
+            }
+            variableHashMap_global.put(variable.getVarName() , variable);
         }
-        variable = new Variable();
-        registerNum++;
-        operationNumber = "%" + registerNum;
-
-        //bType : int
-        variable.setiType(bType);
-        //set regName = ident
-        variable.setVarName(ctx.getChild(0).getText());
-        variable.setOperationNumber(operationNumber);
-        variable.setConst(true);
-        variable.setGlobal(false);
-        variable.setBlockLabel(nowBlockLabel);
-        outputList.add(operationNumber + " = alloca " + variable.getiType() + System.lineSeparator());
-        // define name and value,that is,  constDef : ident = constInitVal
-        if (ctx.children.size() == 3){
-            visit(ctx.constInitVal());
-            outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* "+ variable.getOperationNumber() + System.lineSeparator());
-
+        else {
+            Variable variable = blockArrayList.get(nowBlock).getVariableHashMap().get(ctx.ident().getText());
+            if (variable != null && variable.getBlock() == nowBlock){
+                System.out.println("variable " + variable.getVarName() + " had benn defined before");
+                System.exit(-1);
+            }
+            variable = new Variable();
+            registerNum++;
+            operationNumber = "%" + registerNum;
+            //bType : variable type
+            variable.setiType(bType);
+            //set regName = ident
+            variable.setVarName(ctx.ident().getText());
+            variable.setOperationNumber(operationNumber);
+            variable.setConst(true);
+            variable.setGlobal(false);
+            variable.setBlock(nowBlock);
+            outputList.add(operationNumber + " = alloca " + variable.getiType() + System.lineSeparator());
+            // define name and value,that is,  constDef : ident = constInitVal
+            if (ctx.children.size() == 3){
+                visit(ctx.constInitVal());
+                outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* "+ variable.getOperationNumber() + System.lineSeparator());
+            }
+            //need to store local hashmap
+            blockArrayList.get(nowBlock).getVariableHashMap().put(variable.getVarName(), variable);
         }
-        //need to store local hashmap
-        variableHashMap_local.put(variable.getVarName(), variable);
-//        super.visitVarDef(ctx);
         return null;
     }
 
@@ -160,40 +273,61 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitVarDef(MiniSysParser.VarDefContext ctx) {
-
-        //judge whether variable had been defined
-        Variable variable = variableHashMap_local.get(ctx.ident().getText());
-        if (variable != null && variable.getBlockLabel().equals(nowBlockLabel)){
-            System.out.println("variable " + variable.getVarName() + " had benn defined befor");
-            System.exit(-1);
+        if (defineGlobalVariable){
+            Variable variable = variableHashMap_global.get(ctx.ident().getText());
+            if (variable != null){
+                System.out.println("global variable " + variable.getVarName() + " had benn defined before");
+                System.exit(-1);
+            }
+            variable = new Variable();
+            variable.setiType(bType);
+            variable.setVarName(ctx.ident().getText());
+            variable.setOperationNumber(operationNumber);
+            variable.setConst(false);
+            variable.setGlobal(true);
+            variable.setBlock(-1);
+            if (ctx.initVal() != null){
+                visit(ctx.initVal());
+                if (operationNumber.charAt(0) == '%'){
+                    variable.setValue(computeGlobalVariableValue());
+                }
+                else{
+                    variable.setValue(Integer.parseInt(operationNumber));
+                }
+            }
+            else {
+                variable.setValue(0);
+            }
+            variableHashMap_global.put(variable.getVarName() , variable);
+            globalDeclareList.add("@" + variable.getVarName() + " = dso_local global " + variable.getiType() + " " + variable.getValue() + System.lineSeparator());
         }
-        variable = new Variable();
-        registerNum++;
-        operationNumber = "%" + registerNum;
-
-        //bType : int
-        variable.setiType(bType);
-        //set regName = ident
-        variable.setVarName(ctx.getChild(0).getText());
-        variable.setOperationNumber(operationNumber);
-        variable.setConst(false);
-        variable.setGlobal(false);
-        variable.setBlockLabel(nowBlockLabel);
-        outputList.add(operationNumber + " = alloca " + variable.getiType() + System.lineSeparator());
-        //define only name, that is,  ident
-        if (ctx.children.size() == 1){
-            //do nothing
-//            super.visitVarDef(ctx);
+        else {
+            Variable variable = blockArrayList.get(nowBlock).getVariableHashMap().get(ctx.ident().getText());
+            if (variable != null && variable.getBlock() == nowBlock){
+                System.out.println("variable " + variable.getVarName() + " had benn defined before");
+                System.exit(-1);
+            }
+            variable = new Variable();
+            registerNum++;
+            operationNumber = "%" + registerNum;
+            //bType : variable type
+            variable.setiType(bType);
+            //set regName = ident
+            variable.setVarName(ctx.ident().getText());
+            variable.setOperationNumber(operationNumber);
+            variable.setConst(false);
+            variable.setGlobal(false);
+            variable.setBlock(nowBlock);
+            System.out.println("now block is " + variable.getBlock() + " variable " + variable.getVarName() + " belong to block " + variable.getBlock());
+            outputList.add(operationNumber + " = alloca " + variable.getiType() + System.lineSeparator());
+            // define name and value,that is,  constDef : ident = constInitVal
+            if (ctx.children.size() == 3){
+                visit(ctx.initVal());
+                outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* "+ variable.getOperationNumber() + System.lineSeparator());
+            }
+            //need to store local hashmap
+            blockArrayList.get(nowBlock).getVariableHashMap().put(variable.getVarName(), variable);
         }
-        // define name and value,that is,  varDef : ident = initVal
-        else if (ctx.children.size() == 3){
-            visit(ctx.initVal());
-            outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* "+ variable.getOperationNumber() + System.lineSeparator());
-
-        }
-        //need to store local hashmap
-        variableHashMap_local.put(variable.getVarName(), variable);
-//        super.visitVarDef(ctx);
         return null;
     }
 
@@ -220,9 +354,23 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitBlock(MiniSysParser.BlockContext ctx) {
-        System.out.println("now visit block" + ". block.text is " + ctx.getText());
-
+        System.out.println("now visit block" + ". nowblock is  " + (blockNum+1));
+        //the first block
+        int fatherBlock = nowBlock;
+        blockNum ++;
+        nowBlock = blockNum;
+        Block block = new Block(nowBlock,fatherBlock);
+        if (nowBlock == 0){
+            //copy global variables
+            block.setVariableHashMap(variableHashMap_global);
+        }
+        else {
+            //copy father block 's variables
+            block.setVariableHashMap(blockArrayList.get(fatherBlock).getVariableHashMap());
+        }
+        blockArrayList.add(block);
         super.visitBlock(ctx);
+        nowBlock = fatherBlock;
 
         return null;
     }
@@ -259,7 +407,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         else if (ctx.lVal() != null){
             String regName = ctx.lVal().getText();
             //judge whther regName had benn defined and isConst = false
-            Variable variable = variableHashMap_local.get(regName);
+            Variable variable = blockArrayList.get(nowBlock).getVariableHashMap().get(regName);
             if (variable != null){
                 //local
                 visit(ctx.exp());
@@ -272,14 +420,8 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 }
             }
             else {
-                variable = variableHashMap_global.get(regName);
-                if (variable != null){
-                    //global
-                }
-                else {
-                    System.out.println("stmt : lval had not been defined");
-                    System.exit(-1);
-                }
+                System.out.println("stmt : lval had not been defined");
+                System.exit(-1);
             }
         }
         // if ( cond ) stmt else stmt
@@ -365,55 +507,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         }
         return null;
     }
-
-    public void popAndBackFillLabel1(String brLabel){
-        ArrayList<Block> blocks = blockStack.pop();
-        for (Block block:blocks){
-            block.setBrLabel1(brLabel);
-        }
-    }
-    public void popAndBackFillLabel2(String brLabel){
-        ArrayList<Block> blocks = blockStack.pop();
-        for (Block block:blocks){
-            block.setBrLabel2(brLabel);
-        }
-    }
-    public Block getNewBlock(int brLabelNum){
-        registerNum ++ ;
-        nowBlockLabel = "%" + registerNum;
-        printBlockLabel(registerNum);
-        Block block = new Block();
-        block.setBrLabelNum(brLabelNum);
-        block.setOperationNumber(nowBlockLabel);
-        blockArrayList.add(block);
-        return block;
-    }
-    //if now don't have block or all block is complete, return false
-    public boolean checkAllBlockComplete(){
-        for (Block block : blockArrayList){
-            if (!block.isBrComplete()){
-                return false;
-            }
-        }
-        return true;
-    }
-
-    public boolean checkNeedNewBlock(){
-        if (blockArrayList.size() == 0){
-            return false;
-        }
-        for (Block block : blockArrayList){
-            if (!block.isBrComplete()){
-                return true;
-            }
-        }
-        return false;
-    }
-    public void printBlockLabel2(int regNum){
-        if (blockArrayList.size()>0 || checkNeedNewBlock()){
-            outputList.add(System.lineSeparator() + regNum + ":" + System.lineSeparator());
-        }
-    }
     public void printBlockLabel(int regNum){
         outputList.add(System.lineSeparator() + regNum + ":" + System.lineSeparator());
     }
@@ -466,16 +559,41 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             // the lval was in exp
             //need to judge whether lval had been defined
             //lval : ident
-            Variable variable = variableHashMap_local.get(ctx.lVal().getText());
-            if(variable != null){
-                registerNum ++;
-                operationNumber = "%" + registerNum;
-                outputList.add(operationNumber + " = load i32, " + variable.getiType() + "* " + variable.getOperationNumber() + System.lineSeparator());
+            if (defineGlobalVariable){
+                Variable variable = variableHashMap_global.get(ctx.lVal().getText());
+                if (variable != null){
+                    if (!variable.isConst()){
+                        System.out.println("global var is not const");
+                        System.exit(-1);
+                    }
+                    int value = variable.getValue();
+                    operationNumber = String.valueOf(value);
+                }
+                else {
+                    System.out.println("var has not been defined");
+                    System.exit(-1);
+                }
             }
             else {
-                variable = variableHashMap_global.get(ctx.lVal().getText());
-                if (variable != null){
-                    //need to write global register
+                Variable variable = blockArrayList.get(nowBlock).getVariableHashMap().get(ctx.lVal().getText());
+                if(variable != null){
+                    if (variable.isGlobal()){
+                        if (variable.isConst()){
+                            int value = variable.getValue();
+                            operationNumber = String.valueOf(value);
+                        }
+                        else {
+                            registerNum ++;
+                            operationNumber = "%" + registerNum;
+                            outputList.add(operationNumber + " = load i32, " + variable.getiType() + "* @" + variable.getVarName() + System.lineSeparator());
+                        }
+                    }
+                    else {
+                        registerNum ++;
+                        operationNumber = "%" + registerNum;
+                        outputList.add(operationNumber + " = load i32, " + variable.getiType() + "* " + variable.getOperationNumber() + System.lineSeparator());
+                    }
+
                 }
                 else {
                     System.out.println("primary : lval has not been defined");
@@ -609,9 +727,11 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     @Override
     public Object visitAddExp(MiniSysParser.AddExpContext ctx) {
         System.out.println("now visit addexp");
+        //mulexp
         if(ctx.children.size() == 1){
             visit(ctx.mulExp());
         }
+        //addexp + - mulexp
         else if(ctx.children.size() == 3){
             String register1 = null;
             String register2 = null;

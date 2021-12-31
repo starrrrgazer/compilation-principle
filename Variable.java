@@ -10,7 +10,10 @@ public class Variable {
 
     private String iType;// i32 or i1 or i32* ?
 
-    private String blockLabel; // the label name
+    private int block; // belong to block
+
+    private int value; //global variable value init 0
+
 
     public Variable(){}
 
@@ -67,11 +70,19 @@ public class Variable {
         isConst = aConst;
     }
 
-    public String getBlockLabel() {
-        return blockLabel;
+    public int getBlock() {
+        return block;
     }
 
-    public void setBlockLabel(String blockLabel) {
-        this.blockLabel = blockLabel;
+    public void setBlock(int block) {
+        this.block = block;
+    }
+
+    public int getValue() {
+        return value;
+    }
+
+    public void setValue(int value) {
+        this.value = value;
     }
 }
