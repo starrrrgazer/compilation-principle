@@ -251,6 +251,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         if(child0.equals("return")){
             super.visitStmt(ctx);
             outputList.add("ret " + retType + operationNumber + System.lineSeparator());
+            isReturn = true;
         }
         //exp;
         else if (ctx.lVal()==null && ctx.exp() != null ){
@@ -304,12 +305,15 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             }
             isReturn = false;
             visit(ctx.stmt(0));
-            isReturn = false;
-            outputList.add("br label %");
-            int retIndex = retStack.pop();
-            StackElem stackElem2 = callbackStack.get(retIndex);
-            stackElem2.getLocation().add(outputList.size()-1);
-            callbackStack.set(retIndex,stackElem2);
+            //don't have "ret"
+            if (!isReturn){
+                outputList.add("br label %");
+                isReturn = false;
+                int retIndex = retStack.pop();
+                StackElem stackElem2 = callbackStack.get(retIndex);
+                stackElem2.getLocation().add(outputList.size()-1);
+                callbackStack.set(retIndex,stackElem2);
+            }
             //just if go out
             if (justIf){
                 registerNum++;
