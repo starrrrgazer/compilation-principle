@@ -445,15 +445,18 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             operationNumber = "%" + registerNum;
             outputList.add(System.lineSeparator() + registerNum + ":" + System.lineSeparator());
             StackElem stackElemTmp = callbackStack.pop();
-            for (Integer index : stackElemTmp.getLocation()){
-                if (outputList.get(index).contains("true")){
-                    outputList.set(index,outputList.get(index).replaceFirst("true","%" + registerNum));
-                }
-                else {
-                    outputList.set(index,outputList.get(index).substring(0,outputList.get(index).length())+ ", label %" + registerNum);
-                }
-            }
+            replaceTrueLabel(outputList,stackElemTmp.getLocation(),registerNum);
+//            for (Integer index : stackElemTmp.getLocation()){
+//                if (outputList.get(index).contains("true")){
+//                    outputList.set(index,outputList.get(index).replaceFirst("true","%" + registerNum));
+//                }
+//                else {
+//                    outputList.set(index,outputList.get(index) + ", label %" + registerNum);
+//                }
+//            }
             isReturn = false;
+            isContinue = false;
+            isBreak = false;
             visit(ctx.stmt(0));
             //don't have "ret"
             if (isBreak || isContinue){
@@ -486,7 +489,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 outputList.add("br label %" + registerNum + System.lineSeparator());
                 stackElemTmp = callbackStack.pop();
                 for (Integer index : stackElemTmp.getLocation()){
-                    outputList.set(index, outputList.get(index).substring(0 , outputList.get(index).length() ) + registerNum + System.lineSeparator());
+                    outputList.set(index, outputList.get(index) + registerNum + System.lineSeparator());
                 }
                 outputList.add(System.lineSeparator() + registerNum + ":"+ System.lineSeparator());
             }
@@ -497,17 +500,29 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 }
 
                 isReturn = false;
+                isContinue = false;
+                isBreak = false;
                 visit(ctx.stmt(1));
 
-                registerNum++;
-                operationNumber = "%" + registerNum;
-                outputList.add("br label %" + registerNum + System.lineSeparator());
+                if (isBreak || isContinue){
+                    if (isBreak){
+                        isBreak = false;
+                    }
+                    if (isContinue){
+                        isContinue = false;
+                    }
+                }
+                else {
+                    registerNum++;
+                    operationNumber = "%" + registerNum;
+                    outputList.add("br label %" + registerNum + System.lineSeparator());
+                }
 
                 System.out.println(callbackStack.size());
 
                 stackElemTmp = callbackStack.pop();
                 for (Integer index : stackElemTmp.getLocation()){
-                    outputList.set(index, outputList.get(index).substring(0 , outputList.get(index).length() ) + registerNum + System.lineSeparator());
+                    outputList.set(index, outputList.get(index) + registerNum + System.lineSeparator());
                 }
                 outputList.add(System.lineSeparator() + registerNum + ":"+ System.lineSeparator());
                 if (isReturn){
@@ -545,14 +560,15 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             operationNumber = "%" + registerNum;
             outputList.add(System.lineSeparator() + registerNum + ":" + System.lineSeparator());
             StackElem stackElemTmp = callbackStack.pop();
-            for (Integer index : stackElemTmp.getLocation()){
-                if (outputList.get(index).contains("true")){
-                    outputList.set(index , outputList.get(index).replaceFirst("true", "%" + registerNum));
-                }
-                else {
-                    outputList.set(index, outputList.get(index).substring(0 , outputList.get(index).length()) + ", label %" + registerNum);
-                }
-            }
+            replaceTrueLabel(outputList,stackElemTmp.getLocation(),registerNum);
+//            for (Integer index : stackElemTmp.getLocation()){
+//                if (outputList.get(index).contains("true")){
+//                    outputList.set(index , outputList.get(index).replaceFirst("true", "%" + registerNum));
+//                }
+//                else {
+//                    outputList.set(index, outputList.get(index) + ", label %" + registerNum);
+//                }
+//            }
 
             visit(ctx.stmt(0));
 
@@ -565,16 +581,16 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             }
             if (breakList.size() > 0){
                 for (Integer index : breakList){
-                    System.out.println("break " + outputList.get(index) + " " + registerNum);
+                    System.out.println("break : index is " + index + " " + outputList.get(index) + " " + registerNum);
                     System.out.println(" break list" + breakList);
-                    outputList.set(index, outputList.get(index).substring(0, outputList.get(index).length()) + registerNum + System.lineSeparator());
+                    outputList.set(index, outputList.get(index) + registerNum + System.lineSeparator());
                 }
             }
-            else if (continueList.size()>0){
+            if (continueList.size()>0){
                 for (Integer index : continueList){
-                    System.out.println("continue " + outputList.get(index) + " " + registerNum);
+                    System.out.println("continue : index is " + index + " " + outputList.get(index) + " " + registerNum);
                     System.out.println(" continue list" + continueList);
-                    outputList.set(index, outputList.get(index).substring(0, outputList.get(index).length()) + enterWhileBlockNum + System.lineSeparator());
+                    outputList.set(index, outputList.get(index) + enterWhileBlockNum + System.lineSeparator());
                 }
             }
             //return while cond when no break or continue
@@ -931,7 +947,16 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
         return null;
     }
-
+    public void replaceTrueLabel(ArrayList<String> strings, ArrayList<Integer> indexs, int regNum){
+        for (Integer index : indexs){
+            if (strings.get(index).contains("trueLabel")){
+                strings.set(index, strings.get(index).replace("true", "%" + regNum));
+            }
+            else {
+                strings.set(index,strings.get(index) + ", label %" + regNum);
+            }
+        }
+    }
     @Override
     public Object visitLAndExp(MiniSysParser.LAndExpContext ctx) {
         //land && eq
@@ -941,14 +966,15 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             operationNumber = "%" + registerNum;
             outputList.add(System.lineSeparator() + registerNum + ":" + System.lineSeparator());
             StackElem stackElemTmp = callbackStack.pop();
-            for (Integer index : stackElemTmp.getLocation()){
-                if (outputList.get(index).contains("true")){
-                    outputList.set(index, outputList.get(index).replaceFirst("true", "%" + registerNum));
-                }
-                else {
-                    outputList.set(index,outputList.get(index).substring(0,outputList.get(index).length()) + ", label %" + registerNum);
-                }
-            }
+            replaceTrueLabel(outputList,stackElemTmp.getLocation(),registerNum);
+//            for (Integer index : stackElemTmp.getLocation()){
+//                if (outputList.get(index).contains("true")){
+//                    outputList.set(index, outputList.get(index).replaceFirst("true", "%" + registerNum));
+//                }
+//                else {
+//                    outputList.set(index,outputList.get(index) + ", label %" + registerNum);
+//                }
+//            }
             visit(ctx.eqExp());
             if (ctx.eqExp().children.size() == 1 && ctx.eqExp().relExp().children.size() == 1){
                 registerNum ++;
@@ -1000,7 +1026,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             StackElem stackElemTmp2 = callbackStack.pop();
             for (Integer index : stackElemTmp2.getLocation()){
                 if (outputList.get(index).length() <= 16){
-                    outputList.set(index, outputList.get(index).substring(0,outputList.get(index).length()) + ", label true, label %" + registerNum);
+                    outputList.set(index, outputList.get(index) + ", label trueLabel, label %" + registerNum);
                 }
                 else {
                     outputList.set(index,outputList.get(index) + ",label %" + registerNum);
