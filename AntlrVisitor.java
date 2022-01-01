@@ -354,7 +354,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitBlock(MiniSysParser.BlockContext ctx) {
-        System.out.println("now visit block" + ". nowblock is  " + (blockNum+1));
+        System.out.println("----------------now visit block" + ". nowblock is  " + (blockNum+1) + " fatherblock is " + nowBlock);
         //the first block
         int fatherBlock = nowBlock;
         blockNum ++;
@@ -366,7 +366,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         }
         else {
             //copy father block 's variables
-            block.setVariableHashMap(blockArrayList.get(fatherBlock).getVariableHashMap());
+            block.getVariableHashMap().putAll(blockArrayList.get(fatherBlock).getVariableHashMap());
         }
         blockArrayList.add(block);
         super.visitBlock(ctx);
