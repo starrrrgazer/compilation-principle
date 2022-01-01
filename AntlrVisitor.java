@@ -412,7 +412,13 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 //local
                 visit(ctx.exp());
                 if (!variable.isConst()){
-                    outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* " + variable.getOperationNumber() + System.lineSeparator());
+                    if (variable.isGlobal()){
+                        outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* @" + variable.getVarName() + System.lineSeparator());
+                    }
+                    else {
+                        outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* " + variable.getOperationNumber() + System.lineSeparator());
+                    }
+
                 }
                 else {
                     System.out.println("stmt : lval is const");
