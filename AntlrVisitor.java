@@ -26,6 +26,10 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     ArrayList<Block> blockArrayList = new ArrayList<>();
     ArrayList<String> globalDeclareList = new ArrayList<>();
     boolean defineGlobalVariable = true;
+    ArrayList<Integer> breakList = new ArrayList<>();
+    ArrayList<Integer> continueList = new ArrayList<>();
+    boolean isBreak = false;
+    boolean isContinue = false;
 
     public void initFunctionMap(){
         Function function = new Function("i32","getint",false,null,"declare i32 @getint()" );
@@ -354,7 +358,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitBlock(MiniSysParser.BlockContext ctx) {
-        System.out.println("----------------now visit block" + ". nowblock is  " + (blockNum+1) + " fatherblock is " + nowBlock);
+        System.out.println("now visit block" + ". nowblock is  " + (blockNum+1) + " fatherblock is " + nowBlock);
         //the first block
         int fatherBlock = nowBlock;
         blockNum ++;
@@ -362,7 +366,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         Block block = new Block(nowBlock,fatherBlock);
         if (nowBlock == 0){
             //copy global variables
-            block.setVariableHashMap(variableHashMap_global);
+            block.getVariableHashMap().putAll(variableHashMap_global);
         }
         else {
             //copy father block 's variables
@@ -452,7 +456,15 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             isReturn = false;
             visit(ctx.stmt(0));
             //don't have "ret"
-            if (!isReturn){
+            if (isBreak || isContinue){
+                if (isBreak){
+                    isBreak = false;
+                }
+                if (isContinue){
+                    isContinue = false;
+                }
+            }
+            else if (!isReturn){
                 outputList.add("br label %");
                 isReturn = false;
                 int retIndex = retStack.pop();
@@ -507,6 +519,96 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         //block
         else if (ctx.block() != null){
             visit(ctx.block());
+        }
+        //while ( cond ) stmt
+        else if (child0.equals("while")){
+            //store the break and while info
+            ArrayList<Integer> newBreakList = new ArrayList<>(0);
+            ArrayList<Integer> newContinueList = new ArrayList<>(0);
+            newBreakList.addAll(breakList);
+            newContinueList.addAll(continueList);
+            breakList.clear();
+            continueList.clear();
+
+            //br while cond label block
+            registerNum++;
+            operationNumber = "%" + registerNum;
+            outputList.add("br label %" + registerNum + System.lineSeparator());
+
+            int enterWhileBlockNum = registerNum; //store the regNum when enter while
+            outputList.add(System.lineSeparator() + registerNum + ":" + System.lineSeparator());
+
+            visit(ctx.cond());
+
+            //br while stmt label block
+            registerNum++;
+            operationNumber = "%" + registerNum;
+            outputList.add(System.lineSeparator() + registerNum + ":" + System.lineSeparator());
+            StackElem stackElemTmp = callbackStack.pop();
+            for (Integer index : stackElemTmp.getLocation()){
+                if (outputList.get(index).contains("true")){
+                    outputList.set(index , outputList.get(index).replaceFirst("true", "%" + registerNum));
+                }
+                else {
+                    outputList.set(index, outputList.get(index).substring(0 , outputList.get(index).length()) + ", label %" + registerNum);
+                }
+            }
+
+            visit(ctx.stmt(0));
+
+            registerNum++;
+            operationNumber = "%" + registerNum;
+
+            stackElemTmp = callbackStack.pop();
+            for (Integer index : stackElemTmp.getLocation()){
+                outputList.set(index, outputList.get(index) + ", label %" + registerNum + System.lineSeparator());
+            }
+            if (breakList.size() > 0){
+                for (Integer index : breakList){
+                    System.out.println("break " + outputList.get(index) + " " + registerNum);
+                    System.out.println(" break list" + breakList);
+                    outputList.set(index, outputList.get(index).substring(0, outputList.get(index).length()) + registerNum + System.lineSeparator());
+                }
+            }
+            else if (continueList.size()>0){
+                for (Integer index : continueList){
+                    System.out.println("continue " + outputList.get(index) + " " + registerNum);
+                    System.out.println(" continue list" + continueList);
+                    outputList.set(index, outputList.get(index).substring(0, outputList.get(index).length()) + enterWhileBlockNum + System.lineSeparator());
+                }
+            }
+            //return while cond when no break or continue
+//            else if (breakList.size() == 0 && continueList.size() == 0){
+            if (!isContinue){
+                outputList.add("br label %" + enterWhileBlockNum + System.lineSeparator());
+            }
+//            }
+            //go out of while
+
+            breakList.clear();
+            continueList.clear();
+            breakList.addAll(newBreakList);
+            continueList.addAll(newContinueList);
+            outputList.add(System.lineSeparator() + registerNum + ":" + System.lineSeparator());
+        }
+        else if (child0.equals("continue")){
+//            registerNum ++ ;
+//            operationNumber = "%" + registerNum;
+            outputList.add("br label %");
+            continueList.add(outputList.size() - 1);
+            isContinue = true;
+//            super.visitStmt(ctx);
+//            StackElem stackElem = callbackStack.peek();
+
+
+        }
+        else if (child0.equals("break")){
+//            registerNum++;
+//            operationNumber = "%" + registerNum;
+            outputList.add("br label %");
+            breakList.add(outputList.size() - 1);
+            isBreak = true;
+//            super.visitStmt(ctx);
         }
         else {
             super.visitStmt(ctx);
@@ -768,7 +870,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         if(ctx.children.size() == 1){
             visit(ctx.addExp());
         }
-        //relExp <><=>= addExp
+        //relExp < > <= >= addExp
         else if(ctx.children.size() == 3){
             String register1 = null;
             String register2 = null;
