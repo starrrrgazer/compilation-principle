@@ -696,14 +696,32 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             if (variable != null){
                 //local
                 visit(ctx.exp());
+                String opNumTmp = operationNumber;
                 if (!variable.isConst()){
-                    // TODO if variable is array
-                    if (variable.isGlobal()){
-                        outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* @" + variable.getVarName() + System.lineSeparator());
+                    if (variable.isArray()){
+                        if (ctx.lVal().exp().size() != variable.getDimensions()){
+                            System.out.println("array [] is not equal to dimensions");
+                            System.exit(-1);
+                        }
+                        //first, getelement ptr
+                        getPtrFromArray(ctx.lVal(),variable);
+                        //then store
+                        if (variable.isGlobal()){
+                            outputList.add("store i32 " + opNumTmp + ", " + variable.getiType() + "* " + operationNumber + System.lineSeparator());
+                        }
+                        else {
+                            outputList.add("store i32 " + opNumTmp + ", " + variable.getiType() + "* " + operationNumber + System.lineSeparator());
+                        }
                     }
                     else {
-                        outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* " + variable.getOperationNumber() + System.lineSeparator());
+                        if (variable.isGlobal()){
+                            outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* @" + variable.getVarName() + System.lineSeparator());
+                        }
+                        else {
+                            outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* " + variable.getOperationNumber() + System.lineSeparator());
+                        }
                     }
+
 
                 }
                 else {
@@ -961,7 +979,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                         System.exit(-1);
                     }
                     if (isDefineArray){
-
                         operationNumber_array = variable.getValue();
                     }
                     else {
@@ -996,80 +1013,11 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 if(variable != null){
                     // if is array
                     if (variable.isArray()){
-                        // TODO if variable is array
                         if (variable.isGlobal()){
-                            // TODO if variable is global array
-                            if (ctx.lVal().exp() != null){
-                                ArrayList<String> opNumTmpList = new ArrayList<>();
-                                for (int i = 0; i<ctx.lVal().exp().size() ; i++){
-                                    visit(ctx.lVal().exp(i));
-                                    opNumTmpList.add(operationNumber);
-                                }
-                                if (opNumTmpList.size() != variable.getDimensions()){
-                                    System.out.println("when lval is array, the [] num is not equal to dimensions");
-                                    System.exit(-1);
-                                }
-                                for (int i = 0; i<opNumTmpList.size() ; i++){
-                                    registerNum ++ ;
-                                    operationNumber = "%" + registerNum;
-                                    if ( i == 0){
-                                        outputList.add(operationNumber + " = mul i32 " + opNumTmpList.get(i) + ", " + variable.getArrayDimensionsWeight().get(i) + System.lineSeparator());
-                                    }
-                                    else {
-                                        outputList.add(operationNumber + " = mul i32 " + opNumTmpList.get(i) + ", " + variable.getArrayDimensionsWeight().get(i) + System.lineSeparator());
-                                        registerNum ++;
-                                        operationNumber = "%" + registerNum;
-                                        outputList.add(operationNumber + " = add i32 %" + (registerNum-1) + ", %" + (registerNum-2) + System.lineSeparator());
-                                    }
-                                }
-                                registerNum ++;
-                                operationNumber = "%" + registerNum;
-                                outputList.add(variable.getArrayElementPtrByRegister(operationNumber,"%" + (registerNum-1)));
-                                registerNum ++;
-                                operationNumber = "%" + registerNum;
-                                outputList.add(operationNumber + " = load i32, i32* %" + (registerNum-1) + System.lineSeparator());
-                            }
-                            else {
-                                System.out.println("variable is array , but dont have a[]");
-                                System.exit(-1);
-                            }
+                            loadNumFromArray(ctx.lVal(),variable);
                         }
                         else {
-                            if (ctx.lVal().exp() != null){
-                                ArrayList<String> opNumTmpList = new ArrayList<>();
-                                for (int i = 0; i<ctx.lVal().exp().size() ; i++){
-                                    visit(ctx.lVal().exp(i));
-                                    opNumTmpList.add(operationNumber);
-                                }
-                                if (opNumTmpList.size() != variable.getDimensions()){
-                                    System.out.println("when lval is array, the [] num is not equal to dimensions");
-                                    System.exit(-1);
-                                }
-                                for (int i = 0; i<opNumTmpList.size() ; i++){
-                                    registerNum ++ ;
-                                    operationNumber = "%" + registerNum;
-                                    if ( i == 0){
-                                        outputList.add(operationNumber + " = mul i32 " + opNumTmpList.get(i) + ", " + variable.getArrayDimensionsWeight().get(i) + System.lineSeparator());
-                                    }
-                                    else {
-                                        outputList.add(operationNumber + " = mul i32 " + opNumTmpList.get(i) + ", " + variable.getArrayDimensionsWeight().get(i) + System.lineSeparator());
-                                        registerNum ++;
-                                        operationNumber = "%" + registerNum;
-                                        outputList.add(operationNumber + " = add i32 %" + (registerNum-1) + ", %" + (registerNum-2) + System.lineSeparator());
-                                    }
-                                }
-                                registerNum ++;
-                                operationNumber = "%" + registerNum;
-                                outputList.add(variable.getArrayElementPtrByRegister(operationNumber,"%" + (registerNum-1)));
-                                registerNum ++;
-                                operationNumber = "%" + registerNum;
-                                outputList.add(operationNumber + " = load i32, i32* %" + (registerNum-1) + System.lineSeparator());
-
-                            }
-                            else {
-                                System.out.println("variable is array , but dont have a[]");
-                                System.exit(-1);
-                            }
+                            loadNumFromArray(ctx.lVal(),variable);
                         }
                     }
                     // is not array
@@ -1105,6 +1053,77 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         }
 
         return null;
+    }
+
+    public void getPtrFromArray(MiniSysParser.LValContext ctx , Variable variable){
+        if (ctx.exp() != null){
+            ArrayList<String> opNumTmpList = new ArrayList<>();
+            for (int i = 0; i<ctx.exp().size() ; i++){
+                visit(ctx.exp(i));
+                opNumTmpList.add(operationNumber);
+            }
+            if (opNumTmpList.size() != variable.getDimensions()){
+                System.out.println("when lval is array, the [] num is not equal to dimensions");
+                System.exit(-1);
+            }
+            for (int i = 0; i<opNumTmpList.size() ; i++){
+                registerNum ++ ;
+                operationNumber = "%" + registerNum;
+                if ( i == 0){
+                    outputList.add(operationNumber + " = mul i32 " + opNumTmpList.get(i) + ", " + variable.getArrayDimensionsWeight().get(i) + System.lineSeparator());
+                }
+                else {
+                    outputList.add(operationNumber + " = mul i32 " + opNumTmpList.get(i) + ", " + variable.getArrayDimensionsWeight().get(i) + System.lineSeparator());
+                    registerNum ++;
+                    operationNumber = "%" + registerNum;
+                    outputList.add(operationNumber + " = add i32 %" + (registerNum-1) + ", %" + (registerNum-2) + System.lineSeparator());
+                }
+            }
+            registerNum ++;
+            operationNumber = "%" + registerNum;
+            outputList.add(variable.getArrayElementPtrByRegister(operationNumber,"%" + (registerNum-1)));
+        }
+        else {
+            System.out.println("variable is array , but dont have a[]");
+            System.exit(-1);
+        }
+    }
+
+    public void loadNumFromArray(MiniSysParser.LValContext ctx , Variable variable){
+        if (ctx.exp() != null){
+            ArrayList<String> opNumTmpList = new ArrayList<>();
+            for (int i = 0; i<ctx.exp().size() ; i++){
+                visit(ctx.exp(i));
+                opNumTmpList.add(operationNumber);
+            }
+            if (opNumTmpList.size() != variable.getDimensions()){
+                System.out.println("when lval is array, the [] num is not equal to dimensions");
+                System.exit(-1);
+            }
+            for (int i = 0; i<opNumTmpList.size() ; i++){
+                registerNum ++ ;
+                operationNumber = "%" + registerNum;
+                if ( i == 0){
+                    outputList.add(operationNumber + " = mul i32 " + opNumTmpList.get(i) + ", " + variable.getArrayDimensionsWeight().get(i) + System.lineSeparator());
+                }
+                else {
+                    outputList.add(operationNumber + " = mul i32 " + opNumTmpList.get(i) + ", " + variable.getArrayDimensionsWeight().get(i) + System.lineSeparator());
+                    registerNum ++;
+                    operationNumber = "%" + registerNum;
+                    outputList.add(operationNumber + " = add i32 %" + (registerNum-1) + ", %" + (registerNum-2) + System.lineSeparator());
+                }
+            }
+            registerNum ++;
+            operationNumber = "%" + registerNum;
+            outputList.add(variable.getArrayElementPtrByRegister(operationNumber,"%" + (registerNum-1)));
+            registerNum ++;
+            operationNumber = "%" + registerNum;
+            outputList.add(operationNumber + " = load i32, i32* %" + (registerNum-1) + System.lineSeparator());
+        }
+        else {
+            System.out.println("variable is array , but dont have a[]");
+            System.exit(-1);
+        }
     }
 
     @Override
