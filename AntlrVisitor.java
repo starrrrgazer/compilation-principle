@@ -569,8 +569,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                     outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* "+ variable.getOperationNumber() + System.lineSeparator());
                 }
             }
-
-
             //need to store local hashmap
             blockArrayList.get(nowBlock).getVariableHashMap().put(variable.getVarName(), variable);
         }
@@ -690,7 +688,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         }
         //lval = exp;
         else if (ctx.lVal() != null){
-            String regName = ctx.lVal().getText();
+            String regName = ctx.lVal().ident().getText();
             //judge whther regName had benn defined and isConst = false
             Variable variable = blockArrayList.get(nowBlock).getVariableHashMap().get(regName);
             if (variable != null){
