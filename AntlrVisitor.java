@@ -12,8 +12,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     int nowBlock = -1;
     String nowFuncName;
     String operationNumber = null;
-    //don't need anymore, variables are stored into blockArrayList
-//    HashMap<String, Variable> variableHashMap_local = new HashMap<>(); //is used to store information about variable
+//    HashMap<String, Variable> variableHashMap_local = new HashMap<>(); //is used to store information about variable //don't need anymore, variables are stored into blockArrayList
     HashMap<String, Variable> variableHashMap_global = new HashMap<>(); // belong to block -1
     HashMap<String,Function> functionHashMap = new HashMap<>();
     String bType; // when define var, set bType = btype
@@ -25,11 +24,17 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 //    ListStack<ArrayList<Block>> blockStack = new ListStack<>();
     ArrayList<Block> blockArrayList = new ArrayList<>();
     ArrayList<String> globalDeclareList = new ArrayList<>();
-    boolean defineGlobalVariable = true;
+    boolean isDefineGlobalVariable = true;
     ArrayList<Integer> breakList = new ArrayList<>();
     ArrayList<Integer> continueList = new ArrayList<>();
     boolean isBreak = false;
     boolean isContinue = false;
+    boolean isDefineArray = false; // when define array , need to cal the dimension
+    int operationNumber_array = 0;// is used to cal the dimension
+    int nowDimension = 0;
+    Variable nowArrayVariable;
+    ArrayList<Integer> offsets = new ArrayList<>();
+    boolean isInitGlobalArray = false;
 
     public void initFunctionMap(){
         Function function = new Function("i32","getint",false,null,"declare i32 @getint()" );
@@ -44,12 +49,15 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         functionHashMap.put("putch",function5);
         Function function6 = new Function("void","putarray",false,new String[]{"i32","i32*"},"declare void @putarray(i32,i32*)");
         functionHashMap.put("putarray",function6);
+        Function function7 = new Function("void","memset",false,new String[]{"i32*","i32","i32"},"declare void @memset(i32*, i32, i32)");
+        functionHashMap.put("memset",function7);
         outputList.add("declare i32 @getint()" + System.lineSeparator());
         outputList.add("declare i32 @getch()" + System.lineSeparator());
         outputList.add("declare i32 @getarray(i32*)" + System.lineSeparator());
         outputList.add("declare void @putint(i32)" + System.lineSeparator());
         outputList.add("declare void @putch(i32)" + System.lineSeparator());
         outputList.add("declare void @putarray(i32,i32*)" + System.lineSeparator());
+        outputList.add("declare void @memset(i32*, i32, i32)" + System.lineSeparator());
     }
 
     @Override
@@ -140,11 +148,11 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         System.out.println("now visit compunit");
         //first compunit
         if (ctx.getParent() == null){
-            defineGlobalVariable = true;
+            isDefineGlobalVariable = true;
             if (ctx.compUnit() != null){
                 visit(ctx.compUnit());
             }
-            defineGlobalVariable = false;
+            isDefineGlobalVariable = false;
             initAllGlobalVariables();
             initFunctionMap();
             if (ctx.funcDef() != null){
@@ -206,7 +214,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitConstDef(MiniSysParser.ConstDefContext ctx) {
-        if (defineGlobalVariable){
+        if (isDefineGlobalVariable){
             Variable variable = variableHashMap_global.get(ctx.ident().getText());
             if (variable != null){
                 System.out.println("global variable " + variable.getVarName() + " had benn defined before");
@@ -215,22 +223,68 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             variable = new Variable();
             variable.setiType(bType);
             variable.setVarName(ctx.ident().getText());
-            variable.setOperationNumber(operationNumber);
+            variable.setOperationNumber("@" + variable.getVarName());
             variable.setConst(true);
             variable.setGlobal(true);
             variable.setBlock(-1);
-            if (ctx.constInitVal() != null){
-                visit(ctx.constInitVal());
-                if (operationNumber.charAt(0) == '%'){
-                    variable.setValue(computeGlobalVariableValue());
+            //define global array
+            if (ctx.children.size()>3){
+                variable.setArray(true);
+                isDefineArray = true;
+                int dimensions = 0;
+                int allLength = 1;
+                for (int i = 0 ; i< ctx.constExp().size() ; i++){
+                    dimensions ++;
+                    visit(ctx.constExp(i));
+                    int dimensionLength = operationNumber_array;
+                    if (dimensionLength < 0){
+                        System.out.println("array dimension length < 0");
+                        System.exit(-1);
+                    }
+                    variable.getArrayDimensions().add(dimensionLength);
+                    allLength = allLength * dimensionLength;
                 }
-                else{
-                    variable.setValue(Integer.parseInt(operationNumber));
+                variable.setDimensions(dimensions);
+                variable.setAllLength(allLength);
+                variable.computeArrayDimensionWeight();
+                variable.initArrayValue();
+                isDefineArray = false;
+
+                // then initval
+                if (ctx.constInitVal() != null){
+                    nowDimension = 0;
+                    nowArrayVariable = variable;
+                    offsets.add(0);
+                    isDefineArray = true;
+                    visit(ctx.constInitVal());
+                    isDefineArray = false;
+                    offsets.clear();
+                    nowDimension = 0;
+                    nowArrayVariable = null;
+                    globalDeclareList.add("@" + variable.getVarName() + " = dso_local constant [" + allLength + " x i32] " + variable.getArrayValueString() + System.lineSeparator());
                 }
+                else {
+                    //do nothing
+                    globalDeclareList.add("@" + variable.getVarName() + " = dso_local constant [" + allLength + " x i32] zeroinitializer");
+                }
+
             }
+
             else {
-                variable.setValue(0);
+                if (ctx.constInitVal() != null){
+                    visit(ctx.constInitVal());
+                    if (operationNumber.charAt(0) == '%'){
+                        variable.setValue(computeGlobalVariableValue());
+                    }
+                    else{
+                        variable.setValue(Integer.parseInt(operationNumber));
+                    }
+                }
+                else {
+                    variable.setValue(0);
+                }
             }
+
             variableHashMap_global.put(variable.getVarName() , variable);
         }
         else {
@@ -250,11 +304,61 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             variable.setConst(true);
             variable.setGlobal(false);
             variable.setBlock(nowBlock);
-            outputList.add(operationNumber + " = alloca " + variable.getiType() + System.lineSeparator());
-            // define name and value,that is,  constDef : ident = constInitVal
-            if (ctx.children.size() == 3){
-                visit(ctx.constInitVal());
-                outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* "+ variable.getOperationNumber() + System.lineSeparator());
+
+            //define array , the num of constExp equal to the dimensions
+            if (ctx.children.size() > 3){
+                variable.setArray(true);
+                isDefineArray = true;
+                int dimensions = 0;
+                int allLength = 1;
+                for (int i = 0 ; i< ctx.constExp().size() ; i++){
+                    dimensions ++;
+                    visit(ctx.constExp(i));
+                    int dimensionLength = operationNumber_array;
+                    if (dimensionLength < 0){
+                        System.out.println("array dimension < 0");
+                        System.exit(-1);
+                    }
+                    variable.getArrayDimensions().add(dimensionLength);
+                    allLength = allLength * dimensionLength;
+                }
+                variable.setDimensions(dimensions);
+                variable.setAllLength(allLength);
+                variable.computeArrayDimensionWeight();
+                isDefineArray = false;
+//                outputList.add(variable.allocaArrayString());
+                outputList.add(operationNumber + " = alloca [" + allLength + " x i32]" + System.lineSeparator());
+
+                //first, get ptr
+                registerNum ++;
+                operationNumber = "%" + registerNum;
+                outputList.add(variable.getArrayElementPtrByOffsets(operationNumber, new ArrayList<>()));
+//                outputList.add(operationNumber + " = getelementptr " + variable.getArrayString() + ", " + variable.getArrayString() + "* " + variable.getOperationNumber() + ", i32 0, i32 " + "0" + System.lineSeparator());
+                outputList.add("call void @memset(i32* " + operationNumber + ", i32 0, i32 " + (4*variable.getAllLength()) + ")" + System.lineSeparator());
+
+                // then initval
+                if (ctx.constInitVal() != null){
+                    nowDimension = 0;
+                    nowArrayVariable = variable;
+                    offsets.add(0);
+                    visit(ctx.constInitVal());
+                    offsets.clear();
+                    nowDimension = 0;
+                    nowArrayVariable = null;
+                }
+                else {
+                    //do nothing
+                }
+
+            }
+            else {
+                outputList.add(operationNumber + " = alloca " + variable.getiType() + System.lineSeparator());
+                // define name and value,that is,  constDef : ident = constInitVal
+                if (ctx.children.size() == 3){
+                    visit(ctx.constInitVal());
+                    outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* "+ variable.getOperationNumber() + System.lineSeparator());
+                    variable.setValue(Integer.parseInt(operationNumber));
+                }
             }
             //need to store local hashmap
             blockArrayList.get(nowBlock).getVariableHashMap().put(variable.getVarName(), variable);
@@ -264,7 +368,47 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitConstInitVal(MiniSysParser.ConstInitValContext ctx) {
-        return super.visitConstInitVal(ctx);
+        //only exp
+        if(ctx.constExp() != null){
+            super.visitConstInitVal(ctx);
+        }
+        //define array
+        else {
+            int dimensionTmp = nowDimension;
+            for (int i = 0 ; i<ctx.constInitVal().size() ; i++){
+                if (ctx.constInitVal(i).constInitVal().size() > 0){
+                    if (offsets.size() <= nowDimension+1){
+                        offsets.add(0);
+                    }
+                    else {
+                        offsets.set(nowDimension,i);
+                    }
+                    nowDimension ++;
+                    visit(ctx.constInitVal(i));
+                    nowDimension = dimensionTmp;
+                }
+                else {
+//                    System.exit(-1);
+                    offsets.set(nowDimension,i);
+                    System.out.println(" -------------------- " + operationNumber_array);
+                    visit(ctx.constInitVal(i).constExp());
+                    System.out.println(" --------------------///////////// " + operationNumber_array);
+                    if (isDefineGlobalVariable){
+                        System.out.println("++++++++++++++++++++++++++++" + offsets + " dimension :" + nowDimension + " offset : " + i + " value :" + operationNumber_array);
+                        int numTmp = operationNumber_array;
+                        nowArrayVariable.setArrayValue(numTmp,offsets);
+                    }
+                    else {
+                        String opNumTmp = operationNumber;
+                        registerNum ++ ;
+                        operationNumber = "%" + registerNum;
+                        outputList.add(nowArrayVariable.getArrayElementPtrByOffsets(operationNumber,offsets));
+                        outputList.add("store i32 " + opNumTmp + ", i32* " + operationNumber + System.lineSeparator());
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     @Override
@@ -277,7 +421,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitVarDef(MiniSysParser.VarDefContext ctx) {
-        if (defineGlobalVariable){
+        if (isDefineGlobalVariable){
             Variable variable = variableHashMap_global.get(ctx.ident().getText());
             if (variable != null){
                 System.out.println("global variable " + variable.getVarName() + " had benn defined before");
@@ -286,24 +430,69 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             variable = new Variable();
             variable.setiType(bType);
             variable.setVarName(ctx.ident().getText());
-            variable.setOperationNumber(operationNumber);
+            variable.setOperationNumber("@" + variable.getVarName());
             variable.setConst(false);
             variable.setGlobal(true);
             variable.setBlock(-1);
-            if (ctx.initVal() != null){
-                visit(ctx.initVal());
-                if (operationNumber.charAt(0) == '%'){
-                    variable.setValue(computeGlobalVariableValue());
+            //define global array
+            if (ctx.children.size()>3){
+                variable.setArray(true);
+                isDefineArray = true;
+                int dimensions = 0;
+                int allLength = 1;
+                for (int i = 0 ; i< ctx.constExp().size() ; i++){
+                    dimensions ++;
+                    visit(ctx.constExp(i));
+                    int dimensionLength = operationNumber_array;
+                    if (dimensionLength < 0){
+                        System.out.println("array dimension length < 0");
+                        System.exit(-1);
+                    }
+                    variable.getArrayDimensions().add(dimensionLength);
+                    allLength = allLength * dimensionLength;
                 }
-                else{
-                    variable.setValue(Integer.parseInt(operationNumber));
+                variable.setDimensions(dimensions);
+                variable.setAllLength(allLength);
+                variable.computeArrayDimensionWeight();
+                variable.initArrayValue();
+                isDefineArray = false;
+
+                // then initval
+                if (ctx.initVal() != null){
+                    nowDimension = 0;
+                    nowArrayVariable = variable;
+                    offsets.add(0);
+                    isDefineArray = true;
+                    visit(ctx.initVal());
+                    isDefineArray = false;
+                    offsets.clear();
+                    nowDimension = 0;
+                    nowArrayVariable = null;
+                    globalDeclareList.add("@" + variable.getVarName() + " = dso_local global [" + allLength + " x i32] " + variable.getArrayValueString() + System.lineSeparator());
                 }
+                else {
+                    //do nothing
+                    globalDeclareList.add("@" + variable.getVarName() + " = dso_local global [" + allLength + " x i32] zeroinitializer" + System.lineSeparator());
+                }
+
             }
+            //define global var but not array
             else {
-                variable.setValue(0);
+                if (ctx.initVal() != null){
+                    visit(ctx.initVal());
+                    if (operationNumber.charAt(0) == '%'){
+                        variable.setValue(computeGlobalVariableValue());
+                    }
+                    else{
+                        variable.setValue(Integer.parseInt(operationNumber));
+                    }
+                }
+                else {
+                    variable.setValue(0);
+                }
+                globalDeclareList.add("@" + variable.getVarName() + " = dso_local global " + variable.getiType() + " " + variable.getValue() + System.lineSeparator());
             }
             variableHashMap_global.put(variable.getVarName() , variable);
-            globalDeclareList.add("@" + variable.getVarName() + " = dso_local global " + variable.getiType() + " " + variable.getValue() + System.lineSeparator());
         }
         else {
             Variable variable = blockArrayList.get(nowBlock).getVariableHashMap().get(ctx.ident().getText());
@@ -323,12 +512,65 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             variable.setGlobal(false);
             variable.setBlock(nowBlock);
             System.out.println("now block is " + variable.getBlock() + " variable " + variable.getVarName() + " belong to block " + variable.getBlock());
-            outputList.add(operationNumber + " = alloca " + variable.getiType() + System.lineSeparator());
-            // define name and value,that is,  constDef : ident = constInitVal
-            if (ctx.children.size() == 3){
-                visit(ctx.initVal());
-                outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* "+ variable.getOperationNumber() + System.lineSeparator());
+
+            //define array , the num of constExp equal to the dimensions
+            if (ctx.children.size() > 3){
+                variable.setArray(true);
+                isDefineArray = true;
+                int dimensions = 0;
+                int allLength = 1;
+                for (int i = 0 ; i< ctx.constExp().size() ; i++){
+                    dimensions ++;
+                    visit(ctx.constExp(i));
+                    int dimensionLength = operationNumber_array;
+                    if (dimensionLength < 0){
+                        System.out.println("array dimension < 0");
+                        System.exit(-1);
+                    }
+                    variable.getArrayDimensions().add(dimensionLength);
+                    allLength = allLength * dimensionLength;
+                }
+                variable.setDimensions(dimensions);
+                variable.setAllLength(allLength);
+                variable.computeArrayDimensionWeight();
+                isDefineArray = false;
+
+                outputList.add(operationNumber + " = alloca [" + allLength + " x i32]" + System.lineSeparator());
+
+                //first, get ptr
+                registerNum ++;
+                operationNumber = "%" + registerNum;
+                outputList.add(variable.getArrayElementPtrByOffsets(operationNumber, new ArrayList<>()));
+//                outputList.add(operationNumber + " = getelementptr " + variable.getArrayString() + ", " + variable.getArrayString() + "* " + variable.getOperationNumber() + ", i32 0, i32 " + "0" + System.lineSeparator());
+                outputList.add("call void @memset(i32* " + operationNumber + ", i32 0, i32 " + (4*variable.getAllLength()) + ")" + System.lineSeparator());
+
+                // then initval
+                if (ctx.initVal() != null){
+                    nowDimension = 0;
+                    nowArrayVariable = variable;
+                    offsets.add(0);
+                    visit(ctx.initVal());
+                    offsets.clear();
+                    nowDimension = 0;
+                    nowArrayVariable = null;
+                }
+                else {
+                    //do nothing
+                }
+
             }
+
+            // don't define array
+            else {
+                outputList.add(operationNumber + " = alloca " + variable.getiType() + System.lineSeparator());
+                // define name and value,that is,  constDef : ident = constInitVal
+                if (ctx.children.size() == 3){
+                    visit(ctx.initVal());
+                    outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* "+ variable.getOperationNumber() + System.lineSeparator());
+                }
+            }
+
+
             //need to store local hashmap
             blockArrayList.get(nowBlock).getVariableHashMap().put(variable.getVarName(), variable);
         }
@@ -337,7 +579,46 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitInitVal(MiniSysParser.InitValContext ctx) {
-        return super.visitInitVal(ctx);
+        //only exp
+        if(ctx.exp() != null){
+            super.visitInitVal(ctx);
+        }
+        //define array
+        else {
+            int dimensionTmp = nowDimension;
+            for (int i = 0 ; i<ctx.initVal().size() ; i++){
+                if (ctx.initVal(i).initVal().size() > 0){
+                    if (offsets.size() <= nowDimension+1){
+                        offsets.add(0);
+                    }
+                    else {
+                        offsets.set(nowDimension,i);
+                    }
+                    nowDimension ++;
+                    visit(ctx.initVal(i));
+                    nowDimension = dimensionTmp;
+                }
+                else {
+//                    System.exit(-1);
+                    offsets.set(nowDimension,i);
+                    System.out.println("++++++++++++++++++++++++++++" + offsets + " dimension :" + nowDimension + " offset : " + i);
+                    visit(ctx.initVal(i).exp());
+                    if (isDefineGlobalVariable){
+                        int numTmp = operationNumber_array;
+                        nowArrayVariable.setArrayValue(numTmp,offsets);
+                    }
+                    else {
+                        String opNumTmp = operationNumber;
+                        registerNum ++ ;
+                        operationNumber = "%" + registerNum;
+                        outputList.add(nowArrayVariable.getArrayElementPtrByOffsets(operationNumber,offsets));
+                        outputList.add("store i32 " + opNumTmp + ", i32* " + operationNumber + System.lineSeparator());
+                    }
+
+                }
+            }
+        }
+        return null;
     }
 
     @Override
@@ -416,6 +697,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 //local
                 visit(ctx.exp());
                 if (!variable.isConst()){
+                    // TODO if variable is array
                     if (variable.isGlobal()){
                         outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* @" + variable.getVarName() + System.lineSeparator());
                     }
@@ -657,47 +939,159 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             else {
                 number = Integer.parseInt(numberString);
             }
-            operationNumber = String.valueOf(number);
+            if (isDefineArray){
+                operationNumber_array = number;
+            }
+            else {
+                operationNumber = String.valueOf(number);
+            }
+
         }
         //primary : lval
         else if (ctx.lVal()!=null){
             // the lval was in exp
             //need to judge whether lval had been defined
             //lval : ident
-            if (defineGlobalVariable){
-                Variable variable = variableHashMap_global.get(ctx.lVal().getText());
+            if (isDefineGlobalVariable){
+                // TODO if variable is array
+                Variable variable = variableHashMap_global.get(ctx.lVal().ident().getText());
                 if (variable != null){
                     if (!variable.isConst()){
                         System.out.println("global var is not const");
                         System.exit(-1);
                     }
-                    int value = variable.getValue();
-                    operationNumber = String.valueOf(value);
+                    if (isDefineArray){
+
+                        operationNumber_array = variable.getValue();
+                    }
+                    else {
+                        int value = variable.getValue();
+                        operationNumber = String.valueOf(value);
+                    }
                 }
                 else {
                     System.out.println("var has not been defined");
                     System.exit(-1);
                 }
             }
+            //  define local array
+            else if (isDefineArray){
+                Variable variable = blockArrayList.get(nowBlock).getVariableHashMap().get(ctx.lVal().ident().getText());
+                if (variable != null){
+                    if (!variable.isConst()){
+                        System.out.println(" var is not const");
+                        System.exit(-1);
+                    }
+                    // TODO if variable is array
+                    operationNumber_array = variable.getValue();
+                }
+                else {
+                    System.out.println("var has not been defined");
+                    System.exit(-1);
+                }
+            }
+            // don't define anything
             else {
-                Variable variable = blockArrayList.get(nowBlock).getVariableHashMap().get(ctx.lVal().getText());
+                Variable variable = blockArrayList.get(nowBlock).getVariableHashMap().get(ctx.lVal().ident().getText());
                 if(variable != null){
-                    if (variable.isGlobal()){
-                        if (variable.isConst()){
-                            int value = variable.getValue();
-                            operationNumber = String.valueOf(value);
+                    // if is array
+                    if (variable.isArray()){
+                        // TODO if variable is array
+                        if (variable.isGlobal()){
+                            // TODO if variable is global array
+                            if (ctx.lVal().exp() != null){
+                                ArrayList<String> opNumTmpList = new ArrayList<>();
+                                for (int i = 0; i<ctx.lVal().exp().size() ; i++){
+                                    visit(ctx.lVal().exp(i));
+                                    opNumTmpList.add(operationNumber);
+                                }
+                                if (opNumTmpList.size() != variable.getDimensions()){
+                                    System.out.println("when lval is array, the [] num is not equal to dimensions");
+                                    System.exit(-1);
+                                }
+                                for (int i = 0; i<opNumTmpList.size() ; i++){
+                                    registerNum ++ ;
+                                    operationNumber = "%" + registerNum;
+                                    if ( i == 0){
+                                        outputList.add(operationNumber + " = mul i32 " + opNumTmpList.get(i) + ", " + variable.getArrayDimensionsWeight().get(i) + System.lineSeparator());
+                                    }
+                                    else {
+                                        outputList.add(operationNumber + " = mul i32 " + opNumTmpList.get(i) + ", " + variable.getArrayDimensionsWeight().get(i) + System.lineSeparator());
+                                        registerNum ++;
+                                        operationNumber = "%" + registerNum;
+                                        outputList.add(operationNumber + " = add i32 %" + (registerNum-1) + ", %" + (registerNum-2) + System.lineSeparator());
+                                    }
+                                }
+                                registerNum ++;
+                                operationNumber = "%" + registerNum;
+                                outputList.add(variable.getArrayElementPtrByRegister(operationNumber,"%" + (registerNum-1)));
+                                registerNum ++;
+                                operationNumber = "%" + registerNum;
+                                outputList.add(operationNumber + " = load i32, i32* %" + (registerNum-1) + System.lineSeparator());
+                            }
+                            else {
+                                System.out.println("variable is array , but dont have a[]");
+                                System.exit(-1);
+                            }
+                        }
+                        else {
+                            if (ctx.lVal().exp() != null){
+                                ArrayList<String> opNumTmpList = new ArrayList<>();
+                                for (int i = 0; i<ctx.lVal().exp().size() ; i++){
+                                    visit(ctx.lVal().exp(i));
+                                    opNumTmpList.add(operationNumber);
+                                }
+                                if (opNumTmpList.size() != variable.getDimensions()){
+                                    System.out.println("when lval is array, the [] num is not equal to dimensions");
+                                    System.exit(-1);
+                                }
+                                for (int i = 0; i<opNumTmpList.size() ; i++){
+                                    registerNum ++ ;
+                                    operationNumber = "%" + registerNum;
+                                    if ( i == 0){
+                                        outputList.add(operationNumber + " = mul i32 " + opNumTmpList.get(i) + ", " + variable.getArrayDimensionsWeight().get(i) + System.lineSeparator());
+                                    }
+                                    else {
+                                        outputList.add(operationNumber + " = mul i32 " + opNumTmpList.get(i) + ", " + variable.getArrayDimensionsWeight().get(i) + System.lineSeparator());
+                                        registerNum ++;
+                                        operationNumber = "%" + registerNum;
+                                        outputList.add(operationNumber + " = add i32 %" + (registerNum-1) + ", %" + (registerNum-2) + System.lineSeparator());
+                                    }
+                                }
+                                registerNum ++;
+                                operationNumber = "%" + registerNum;
+                                outputList.add(variable.getArrayElementPtrByRegister(operationNumber,"%" + (registerNum-1)));
+                                registerNum ++;
+                                operationNumber = "%" + registerNum;
+                                outputList.add(operationNumber + " = load i32, i32* %" + (registerNum-1) + System.lineSeparator());
+
+                            }
+                            else {
+                                System.out.println("variable is array , but dont have a[]");
+                                System.exit(-1);
+                            }
+                        }
+                    }
+                    // is not array
+                    else {
+                        if (variable.isGlobal()){
+                            if (variable.isConst()){
+                                int value = variable.getValue();
+                                operationNumber = String.valueOf(value);
+                            }
+                            else {
+                                registerNum ++;
+                                operationNumber = "%" + registerNum;
+                                outputList.add(operationNumber + " = load i32, " + variable.getiType() + "* @" + variable.getVarName() + System.lineSeparator());
+                            }
                         }
                         else {
                             registerNum ++;
                             operationNumber = "%" + registerNum;
-                            outputList.add(operationNumber + " = load i32, " + variable.getiType() + "* @" + variable.getVarName() + System.lineSeparator());
+                            outputList.add(operationNumber + " = load i32, " + variable.getiType() + "* " + variable.getOperationNumber() + System.lineSeparator());
                         }
                     }
-                    else {
-                        registerNum ++;
-                        operationNumber = "%" + registerNum;
-                        outputList.add(operationNumber + " = load i32, " + variable.getiType() + "* " + variable.getOperationNumber() + System.lineSeparator());
-                    }
+
 
                 }
                 else {
@@ -724,9 +1118,15 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         else if(ctx.unaryOp() != null){
             visit(ctx.unaryExp());
             if(ctx.unaryOp().getText().equals("-")){
-                registerNum++;
-                outputList.add("%" + registerNum + " = sub " + "i32 " + "0" + ", "+operationNumber + System.lineSeparator());
-                operationNumber = "%" + registerNum;
+                if (isDefineArray){
+                    operationNumber_array = -operationNumber_array;
+                }
+                else {
+                    registerNum++;
+                    outputList.add("%" + registerNum + " = sub " + "i32 " + "0" + ", "+operationNumber + System.lineSeparator());
+                    operationNumber = "%" + registerNum;
+                }
+
             }
             //need update
             else if (ctx.unaryOp().getText().equals("!")){
@@ -803,25 +1203,43 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             visit(ctx.unaryExp());
         }
         else if(ctx.children.size() == 3){
-            String register1 = null;
-            String register2 = null;
-            visit(ctx.mulExp());
-            register1 = operationNumber;
-            visit(ctx.unaryExp());
-            register2 = operationNumber;
+            if (isDefineArray){
+                visit(ctx.mulExp());
+                int num1 = operationNumber_array;
+                visit(ctx.unaryExp());
+                int num2 = operationNumber_array;
+                String op = String.valueOf(ctx.getChild(1));
+                if(op.equals("*")){
+                    operationNumber_array = num1 * num2;
+                }
+                else if(op.equals("/")){
+                    operationNumber_array = num1 / num2;
+                }
+                else if(op.equals("%")){
+                    operationNumber_array = num1 % num2;
+                }
+            }
+            else {
+                String register1 = null;
+                String register2 = null;
+                visit(ctx.mulExp());
+                register1 = operationNumber;
+                visit(ctx.unaryExp());
+                register2 = operationNumber;
 
-            String op = String.valueOf(ctx.getChild(1));
-            registerNum++;
-            if(op.equals("*")){
-                outputList.add("%" + registerNum + " = mul " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+                String op = String.valueOf(ctx.getChild(1));
+                registerNum++;
+                if(op.equals("*")){
+                    outputList.add("%" + registerNum + " = mul " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+                }
+                else if(op.equals("/")){
+                    outputList.add("%" + registerNum + " = sdiv " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+                }
+                else if(op.equals("%")){
+                    outputList.add("%" + registerNum + " = srem " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+                }
+                operationNumber = "%" + registerNum;
             }
-            else if(op.equals("/")){
-                outputList.add("%" + registerNum + " = sdiv " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
-            }
-            else if(op.equals("%")){
-                outputList.add("%" + registerNum + " = srem " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
-            }
-            operationNumber = "%" + registerNum;
         }
         else {
             super.visit(ctx);
@@ -838,21 +1256,36 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         }
         //addexp + - mulexp
         else if(ctx.children.size() == 3){
-            String register1 = null;
-            String register2 = null;
-            visit(ctx.addExp());
-            register1 = operationNumber;
-            visit(ctx.mulExp());
-            register2 = operationNumber;
-            String op = String.valueOf(ctx.getChild(1));
-            registerNum++;
-            if(op.equals("+")){
-                outputList.add("%" + registerNum + " = add " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+            if (isDefineArray){
+                visit(ctx.addExp());
+                int num1 = operationNumber_array;
+                visit(ctx.mulExp());
+                int num2 = operationNumber_array;
+                String op = String.valueOf(ctx.getChild(1));
+                if(op.equals("+")){
+                   operationNumber_array = num1 + num2;
+                }
+                else if(op.equals("-")){
+                    operationNumber_array = num1 - num2;
+                }
             }
-            else if(op.equals("-")){
-                outputList.add("%" + registerNum + " = sub " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+            else {
+                String register1 = null;
+                String register2 = null;
+                visit(ctx.addExp());
+                register1 = operationNumber;
+                visit(ctx.mulExp());
+                register2 = operationNumber;
+                String op = String.valueOf(ctx.getChild(1));
+                registerNum++;
+                if(op.equals("+")){
+                    outputList.add("%" + registerNum + " = add " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+                }
+                else if(op.equals("-")){
+                    outputList.add("%" + registerNum + " = sub " + "i32 " +  register1 + ", "+ register2+ System.lineSeparator());
+                }
+                operationNumber = "%" + registerNum;
             }
-            operationNumber = "%" + registerNum;
         }
         else {
             super.visit(ctx);

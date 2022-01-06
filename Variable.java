@@ -1,3 +1,5 @@
+import java.util.ArrayList;
+
 public class Variable {
 
     private String operationNumber; // register num
@@ -14,8 +16,26 @@ public class Variable {
 
     private int value; //global variable value init 0
 
+    private boolean isArray;// whether is array
 
-    public Variable(){}
+    private int dimensions;// array dimension num
+
+    private int allLength;// array all length =   every dimension length * every dimension length * ... , that is equal to arrayDimensions mul each other
+
+    private ArrayList<Integer> arrayDimensions;//the length of every array dimension
+
+    private ArrayList<Integer> arrayDimensionsWeight;//the weight of every dimension
+
+    private ArrayList<Integer> arrayValue;
+
+    public Variable(){
+        this.isArray = false;
+        this.arrayDimensions = new ArrayList<>();
+        this.arrayDimensionsWeight = new ArrayList<>();
+        this.arrayValue = new ArrayList<>();
+        this.dimensions = 0;
+        this.allLength = 0;
+    }
 
     public Variable(String number, String regName, boolean isConst, boolean isGlobal, String iType){
         this.operationNumber = number;
@@ -23,6 +43,122 @@ public class Variable {
         this.isConst = isConst;
         this.isGlobal = isGlobal;
         this.iType = iType;
+        this.isArray = false;
+        this.arrayDimensions = new ArrayList<>();
+        this.arrayDimensionsWeight = new ArrayList<>();
+        this.arrayValue = new ArrayList<>();
+        this.dimensions = 0;
+        this.allLength = 0;
+    }
+
+    public void initArrayValue(){
+        for (int i = 0; i<allLength ;i++){
+            arrayValue.add(0);
+        }
+    }
+
+    public String getArrayValueString(){
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("[");
+        for (int i = 0 ; i< allLength-1 ; i++){
+            stringBuilder.append("i32 " + arrayValue.get(i) + ", ");
+        }
+        stringBuilder.append("i32 " + arrayValue.get(allLength-1) + "]");
+        return stringBuilder.toString();
+    }
+
+    public void setArrayValue(int value, ArrayList<Integer> offsets){
+        int len = 0;
+        offsets = addZeroToIntArray(offsets);
+        for (int i = 0; i<dimensions ; i++){
+            len = len + offsets.get(i) * arrayDimensionsWeight.get(i);
+        }
+        arrayValue.set(len,value);
+    }
+
+    public void computeArrayDimensionWeight(){
+        for (int i = 0; i<dimensions ; i++){
+            int weight = 1;
+            for (int j = i+1; j<dimensions ; j++){
+                weight = weight * arrayDimensions.get(j);
+            }
+            this.arrayDimensionsWeight.add(weight);
+        }
+    }
+
+    public String getArrayElementPtrByRegister(String regNum, String register){
+        return regNum + " = getelementptr "
+                + "[" + allLength + " x i32" + "]" + ", " + "[" + allLength + " x i32" + "]" + "* " + operationNumber
+                + ", i32 0," + " i32 " + register + System.lineSeparator();
+    }
+
+    public String getArrayElementPtrByOffsets(String regNum, ArrayList<Integer> offsets){
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append(regNum + " = getelementptr "
+                + "[" + allLength + " x i32" + "]" + ", " + "[" + allLength + " x i32" + "]" + "* " + operationNumber
+                + ", i32 0," + " i32 "
+        );
+        int len = 0;
+        offsets = addZeroToIntArray(offsets);
+        for (int i = 0; i<dimensions ; i++){
+            len = len + offsets.get(i) * arrayDimensionsWeight.get(i);
+        }
+        stringBuilder.append(len + System.lineSeparator());
+        return stringBuilder.toString();
+    }
+
+    public ArrayList<Integer> addZeroToIntArray(ArrayList<Integer> integers){
+        while (integers.size() < dimensions){
+            integers.add(0);
+        }
+        return integers;
+    }
+
+    public String getArrayElementPtrByDimension(String regNum, int dimension){
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append(regNum + " = getelementptr "
+                + "[" + allLength + " x i32" + "]" + ", " + "[" + allLength + " x i32" + "]" + "* " + operationNumber
+                + ",i32 0," + " i32 "
+        );
+        int len = 0;
+        for (int i = 0; i<dimension ; i++){
+            len = len + arrayDimensions.get(i);
+        }
+        stringBuilder.append(len + System.lineSeparator());
+        return stringBuilder.toString();
+    }
+
+    public String getArrayElementPtrByPosition(String regNum , int position){
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append(regNum + " = getelementptr "
+                + "[" + allLength + " x i32" + "]" + ", " + "[" + allLength + " x i32" + "]" + "* " + operationNumber
+                + ",i32 0," + " i32 "
+        );
+        stringBuilder.append(position + System.lineSeparator());
+        return stringBuilder.toString();
+    }
+
+    public String allocaArrayString(){
+        StringBuilder stringBuilder = new StringBuilder();
+        if (isGlobal){
+
+        }
+        else {
+            stringBuilder.append(operationNumber + " = alloca ");
+            for (int i = 0; i<dimensions ; i++){
+                if ( i == (dimensions-1)){
+                    stringBuilder.append("[" + arrayDimensions.get(i) + " x " + iType + "]");
+                }
+                else {
+                    stringBuilder.append("[" + arrayDimensions.get(i) + " x ");
+                }
+            }
+            if (dimensions > 1){
+                stringBuilder.append("]");
+            }
+            stringBuilder.append(System.lineSeparator());
+        }
+        return stringBuilder.toString();
     }
 
     public String getiType() {
@@ -84,5 +220,53 @@ public class Variable {
 
     public void setValue(int value) {
         this.value = value;
+    }
+
+    public boolean isArray() {
+        return isArray;
+    }
+
+    public void setArray(boolean array) {
+        isArray = array;
+    }
+
+    public ArrayList<Integer> getArrayDimensions() {
+        return arrayDimensions;
+    }
+
+    public void setArrayDimensions(ArrayList<Integer> arrayDimensions) {
+        this.arrayDimensions = arrayDimensions;
+    }
+
+    public int getDimensions() {
+        return dimensions;
+    }
+
+    public void setDimensions(int dimensions) {
+        this.dimensions = dimensions;
+    }
+
+    public int getAllLength() {
+        return allLength;
+    }
+
+    public void setAllLength(int allLength) {
+        this.allLength = allLength;
+    }
+
+    public ArrayList<Integer> getArrayDimensionsWeight() {
+        return arrayDimensionsWeight;
+    }
+
+    public void setArrayDimensionsWeight(ArrayList<Integer> arrayDimensionsWeight) {
+        this.arrayDimensionsWeight = arrayDimensionsWeight;
+    }
+
+    public ArrayList<Integer> getArrayValue() {
+        return arrayValue;
+    }
+
+    public void setArrayValue(ArrayList<Integer> arrayValue) {
+        this.arrayValue = arrayValue;
     }
 }
