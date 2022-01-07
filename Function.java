@@ -1,3 +1,6 @@
+import java.util.ArrayList;
+import java.util.HashMap;
+
 public class Function {
     /*
     * System function include
@@ -11,8 +14,10 @@ public class Function {
     private String retType; // i32 or ?
     private String funcName;//ident(name), don't include @
     private boolean isDeclare;
-    private String[] paramsType; // store params type i32 or i32* ?
+    private ArrayList<String> paramsType; // store params type i32 or i32*
     private String declareString;
+    private HashMap<String,Variable> functionParams; // funcParams
+    private ArrayList<String> paramsName; // store params name
 
     public boolean isDeclare() {
         return isDeclare;
@@ -22,23 +27,31 @@ public class Function {
         isDeclare = declare;
     }
 
-    public String[] getParamsType() {
-        return paramsType;
-    }
 
-    public void setParamsType(String[] paramsType) {
-        this.paramsType = paramsType;
-    }
 
     public Function(){
-
+        this.paramsType = new ArrayList<>();
+        this.paramsName = new ArrayList<>();
+        this.functionParams = new HashMap<>();
     }
-    public Function(String retType,String funcName,boolean isDeclear,String[] params,String declareString){
+    public Function(String retType,String funcName,boolean isDeclear,ArrayList<String> params,String declareString){
         this.retType = retType;
         this.funcName = funcName;
         this.isDeclare = isDeclear;
         this.paramsType = params;
         this.declareString = declareString;
+    }
+
+    public String defineFuncString(){
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("define dso_local " + retType + " @" + funcName + "(");
+        int num = 0;
+        int paramNum = paramsType.size();
+        for (int i = 0;i < paramNum-1 ;i ++){
+            stringBuilder.append(paramsType.get(i) + " %" + i + ", ");
+        }
+        stringBuilder.append(paramsType.get(paramNum-1) + " %" + (paramNum-1) + ")");
+        return stringBuilder.toString();
     }
 
     public String getRetType() {
@@ -72,5 +85,29 @@ public class Function {
             }
         }
         return false;
+    }
+
+    public HashMap<String, Variable> getFunctionParams() {
+        return functionParams;
+    }
+
+    public void setFunctionParams(HashMap<String, Variable> functionParams) {
+        this.functionParams = functionParams;
+    }
+
+    public ArrayList<String> getParamsType() {
+        return paramsType;
+    }
+
+    public void setParamsType(ArrayList<String> paramsType) {
+        this.paramsType = paramsType;
+    }
+
+    public ArrayList<String> getParamsName() {
+        return paramsName;
+    }
+
+    public void setParamsName(ArrayList<String> paramsName) {
+        this.paramsName = paramsName;
     }
 }

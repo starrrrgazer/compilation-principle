@@ -10,7 +10,7 @@ public class Variable {
 
     private boolean isGlobal;//
 
-    private String iType;// i32 or i1 or i32* ?
+    private String iType;// i32 or i1 or i32*(array)
 
     private int block; // belong to block
 
@@ -28,13 +28,16 @@ public class Variable {
 
     private ArrayList<Integer> arrayValue;
 
+    private boolean isFuncParam;
+
     public Variable(){
         this.isArray = false;
         this.arrayDimensions = new ArrayList<>();
         this.arrayDimensionsWeight = new ArrayList<>();
         this.arrayValue = new ArrayList<>();
-        this.dimensions = 0;
+        this.dimensions = 1;
         this.allLength = 0;
+        this.isFuncParam = false;
     }
 
     public Variable(String number, String regName, boolean isConst, boolean isGlobal, String iType){
@@ -47,8 +50,9 @@ public class Variable {
         this.arrayDimensions = new ArrayList<>();
         this.arrayDimensionsWeight = new ArrayList<>();
         this.arrayValue = new ArrayList<>();
-        this.dimensions = 0;
+        this.dimensions = 1;
         this.allLength = 0;
+        this.isFuncParam = false;
     }
 
     public void initArrayValue(){
@@ -169,6 +173,9 @@ public class Variable {
         if(iType.equals("int")){
             this.iType = "i32";
         }
+        else if (iType.equals("i32*")){
+            this.iType = "i32*";
+        }
         else {
             this.iType = "i32";
         }
@@ -268,5 +275,13 @@ public class Variable {
 
     public void setArrayValue(ArrayList<Integer> arrayValue) {
         this.arrayValue = arrayValue;
+    }
+
+    public boolean isFuncParam() {
+        return isFuncParam;
+    }
+
+    public void setFuncParam(boolean funcParam) {
+        isFuncParam = funcParam;
     }
 }

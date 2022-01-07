@@ -34,60 +34,127 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     int nowDimension = 0;
     Variable nowArrayVariable;
     ArrayList<Integer> offsets = new ArrayList<>();
-    boolean isInitGlobalArray = false;
+    boolean isDefineFunc = false;
+    Function nowFunction;
+    ArrayList<String> functionOutputList = new ArrayList<>();
+    boolean isFuncDefBlock = false;
+
 
     public void initFunctionMap(){
+        ArrayList<String> strings = new ArrayList<>();
         Function function = new Function("i32","getint",false,null,"declare i32 @getint()" );
         functionHashMap.put("getint",function);
         Function function2 = new Function("i32","getch",false,null,"declare i32 @getch()");
         functionHashMap.put("getch",function2);
-        Function function3 = new Function("i32","getarray",false, new String[]{"i32*"},"declare i32 @getarray(i32*)");
+        strings.add("i32*");
+        Function function3 = new Function("i32","getarray",false, strings,"declare i32 @getarray(i32*)");
         functionHashMap.put("getarray",function3);
-        Function function4 = new Function("void","putint",false,new String[]{"i32"},"declare void @putint(i32)");
+        strings.clear();
+        strings.add("i32");
+        Function function4 = new Function("void","putint",false,strings,"declare void @putint(i32)");
         functionHashMap.put("putint",function4);
-        Function function5= new Function("void","putch",false,new String[]{"i32"},"declare void @putch(i32)");
+        strings.clear();
+        strings.add("i32");
+        Function function5= new Function("void","putch",false,strings,"declare void @putch(i32)");
         functionHashMap.put("putch",function5);
-        Function function6 = new Function("void","putarray",false,new String[]{"i32","i32*"},"declare void @putarray(i32,i32*)");
+        strings.clear();
+        strings.add("i32");
+        strings.add("i32*");
+        Function function6 = new Function("void","putarray",false,strings,"declare void @putarray(i32,i32*)");
         functionHashMap.put("putarray",function6);
-        Function function7 = new Function("void","memset",false,new String[]{"i32*","i32","i32"},"declare void @memset(i32*, i32, i32)");
+        strings.clear();
+        strings.add("i32*");
+        strings.add("i32");
+        strings.add("i32");
+        Function function7 = new Function("void","memset",false,strings,"declare void @memset(i32*, i32, i32)");
         functionHashMap.put("memset",function7);
-        outputList.add("declare i32 @getint()" + System.lineSeparator());
-        outputList.add("declare i32 @getch()" + System.lineSeparator());
-        outputList.add("declare i32 @getarray(i32*)" + System.lineSeparator());
-        outputList.add("declare void @putint(i32)" + System.lineSeparator());
-        outputList.add("declare void @putch(i32)" + System.lineSeparator());
-        outputList.add("declare void @putarray(i32,i32*)" + System.lineSeparator());
-        outputList.add("declare void @memset(i32*, i32, i32)" + System.lineSeparator());
+        functionOutputList.add("declare i32 @getint()" + System.lineSeparator());
+        functionOutputList.add("declare i32 @getch()" + System.lineSeparator());
+        functionOutputList.add("declare i32 @getarray(i32*)" + System.lineSeparator());
+        functionOutputList.add("declare void @putint(i32)" + System.lineSeparator());
+        functionOutputList.add("declare void @putch(i32)" + System.lineSeparator());
+        functionOutputList.add("declare void @putarray(i32,i32*)" + System.lineSeparator());
+        functionOutputList.add("declare void @memset(i32*, i32, i32)" + System.lineSeparator());
     }
 
     @Override
     public Object visitFuncDef(MiniSysParser.FuncDefContext ctx) {
         System.out.println("now visit funcdef");
-        outputList.add("define dso_local ");
-        if (ctx.funcType().getText().equals("int")){
-            retType = "i32 ";
-            outputList.add("i32 ");
+        String funcName = ctx.ident().getText();
+        funcInit(funcName);
+        //define other function
+        if (isDefineFunc){
+            Function function = functionHashMap.get(funcName);
+            if (function != null){
+                System.out.println("function had been defined");
+                System.exit(-1);
+            }
+            else {
+                function = new Function();
+                functionHashMap.put(funcName,function);
+                nowFunction = function;
+                //retType
+                if (ctx.funcType().getText().equals("int")){
+                    function.setRetType("i32");
+                }
+                else if (ctx.funcType().getText().equals("void")){
+                    function.setRetType("void");
+                }
+                else {
+                    System.out.println("retType is not int or void");
+                    System.exit(-1);
+                }
+                //ident
+                function.setFuncName(funcName);
+                //funcFParams
+                visit(ctx.funcFParams());
+                //block
+                isFuncDefBlock = true;
+                functionOutputList.add(nowFunction.defineFuncString() + " {" + System.lineSeparator());
+//                for (int i = 0; i< size; i++){
+//                    registerNum ++ ;
+//                    operationNumber = "%" + registerNum;
+//                    String type = nowFunction.getParamsType()[i];
+//                    if (type.equals("i32")){
+//                        functionOutputList.add(operationNumber + " = alloca " + type);
+//                    }
+//                    else if (type.equals("i32*")){
+//
+//                    }
+//
+//                }
+                visit(ctx.block());
+                functionOutputList.add("}" + System.lineSeparator());
+            }
         }
-        if (ctx.ident().getText().equals("main")){
-            outputList.add("@main");
-            outputList.add("(");
-            //this should be a visit param
-            outputList.add(")");
-            outputList.add(" {" + System.lineSeparator());
-            visit(ctx.block());
-            outputList.add("}");
-        }
+        //define main
+        else {
+            if (ctx.ident().getText().equals("main")){
 
+                outputList = new ArrayList<>();
+                registerNum = 0;
+
+                outputList.add("define dso_local i32 @main()");
+                outputList.add(" {" + System.lineSeparator());
+                isFuncDefBlock = true;
+                visit(ctx.block());
+                outputList.add("}");
+                functionHashMap.put("main",new Function());
+            }
+            else {
+                System.out.println("main is not the last function");
+                System.exit(-1);
+            }
+        }
         return null;
     }
 
-    public void initAllGlobalVariables(){
-        System.out.println(outputList);
-        outputList = new ArrayList<>();
-        registerNum = 0;
-        nowFuncName = new String();
+    public void funcInit(String funcName){
+        System.out.println("funcInit");
+        registerNum = -1;
         operationNumber = null;
-        isReturn = false ; // judge whether if return
+        nowFuncName = funcName;
+        isReturn = false;
         callbackStack = new Stack<>(); // if block callback
         retStack = new Stack<Integer>();// ret index
     }
@@ -148,13 +215,14 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         System.out.println("now visit compunit");
         //first compunit
         if (ctx.getParent() == null){
+            initFunctionMap();
             isDefineGlobalVariable = true;
+            isDefineFunc = true;
             if (ctx.compUnit() != null){
                 visit(ctx.compUnit());
             }
+            isDefineFunc = false;
             isDefineGlobalVariable = false;
-            initAllGlobalVariables();
-            initFunctionMap();
             if (ctx.funcDef() != null){
                 visit(ctx.funcDef());
             }
@@ -162,6 +230,10 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 visit(ctx.decl());
             }
 
+            if (functionHashMap.get("main") == null){
+                System.out.println("main had not been defined");
+                System.exit(-1);
+            }
             outputListToString();
             System.out.println("now exit");
         }
@@ -176,6 +248,9 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     public void outputListToString(){
         outputListString = new String();
         for (String s : globalDeclareList){
+            outputListString += s;
+        }
+        for (String s : functionOutputList){
             outputListString += s;
         }
         for (String s : outputList){
@@ -627,6 +702,30 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 
     @Override
     public Object visitFuncFParams(MiniSysParser.FuncFParamsContext ctx) {
+        int size = ctx.funcFParam().size();
+        for (int i = 0; i< size; i++){
+            bType = ctx.funcFParam(i).bType().getText();
+            String paramName = ctx.funcFParam(i).ident().getText();
+            registerNum ++;
+            operationNumber = "%" + registerNum;
+            Variable variable = new Variable();
+            variable.setFuncParam(true);
+            variable.setVarName(paramName);
+            variable.setOperationNumber(operationNumber);
+            //array
+            if (ctx.funcFParam(i).children.size() > 2){
+                variable.setiType("i32*");
+                nowFunction.getParamsType().add("i32*");
+                nowFunction.getParamsName().add(paramName);
+            }
+            //int
+            else {
+                variable.setiType("i32");
+                nowFunction.getParamsType().add("i32");
+                nowFunction.getParamsName().add(paramName);
+            }
+            nowFunction.getFunctionParams().put(paramName,variable);
+        }
         return super.visitFuncFParams(ctx);
     }
 
@@ -643,9 +742,13 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         blockNum ++;
         nowBlock = blockNum;
         Block block = new Block(nowBlock,fatherBlock);
-        if (nowBlock == 0){
+        if (isFuncDefBlock){
+            isFuncDefBlock = false;
             //copy global variables
             block.getVariableHashMap().putAll(variableHashMap_global);
+            if (isDefineFunc){
+                block.getVariableHashMap().putAll(nowFunction.getFunctionParams());
+            }
         }
         else {
             //copy father block 's variables
@@ -654,6 +757,8 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         blockArrayList.add(block);
         super.visitBlock(ctx);
         nowBlock = fatherBlock;
+
+
 
         return null;
     }
