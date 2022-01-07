@@ -38,7 +38,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     Function nowFunction;
     ArrayList<String> functionOutputList = new ArrayList<>();
     boolean isFuncDefBlock = false;
-
+    int operationNumber_global = 0;
 
     public void initFunctionMap(){
         ArrayList<String> strings = new ArrayList<>();
@@ -111,18 +111,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 //block
                 isFuncDefBlock = true;
                 functionOutputList.add(nowFunction.defineFuncString() + " {" + System.lineSeparator());
-//                for (int i = 0; i< size; i++){
-//                    registerNum ++ ;
-//                    operationNumber = "%" + registerNum;
-//                    String type = nowFunction.getParamsType()[i];
-//                    if (type.equals("i32")){
-//                        functionOutputList.add(operationNumber + " = alloca " + type);
-//                    }
-//                    else if (type.equals("i32*")){
-//
-//                    }
-//
-//                }
+                //TODO init funcFParams
                 visit(ctx.block());
                 functionOutputList.add("}" + System.lineSeparator());
             }
@@ -147,6 +136,19 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             }
         }
         return null;
+    }
+
+    public void funcFParamsInit(){
+        System.out.println("funcFParamsInit");
+        int paramsNum = nowFunction.getParamsName().size();
+        for (int i = 0; i<paramsNum;i++){
+            Variable variable = nowFunction.getFunctionParams().get(nowFunction.getParamsName().get(i));
+            if (variable.getiType().equals("i32")){
+                registerNum ++;
+                operationNumber = "%" + registerNum;
+//                functionOutputList.add();
+            }
+        }
     }
 
     public void funcInit(String funcName){
@@ -348,12 +350,12 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             else {
                 if (ctx.constInitVal() != null){
                     visit(ctx.constInitVal());
-                    if (operationNumber.charAt(0) == '%'){
-                        variable.setValue(computeGlobalVariableValue());
-                    }
-                    else{
-                        variable.setValue(Integer.parseInt(operationNumber));
-                    }
+//                    if (operationNumber.charAt(0) == '%'){
+//                        variable.setValue(computeGlobalVariableValue());
+//                    }
+//                    else{
+                        variable.setValue(operationNumber_global);
+//                    }
                 }
                 else {
                     variable.setValue(0);
@@ -463,13 +465,10 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                     nowDimension = dimensionTmp;
                 }
                 else {
-//                    System.exit(-1);
                     offsets.set(nowDimension,i);
-                    System.out.println(" -------------------- " + operationNumber_array);
                     visit(ctx.constInitVal(i).constExp());
-                    System.out.println(" --------------------///////////// " + operationNumber_array);
                     if (isDefineGlobalVariable){
-                        System.out.println("++++++++++++++++++++++++++++" + offsets + " dimension :" + nowDimension + " offset : " + i + " value :" + operationNumber_array);
+//                        System.out.println("++++++++++++++++++++++++++++" + offsets + " dimension :" + nowDimension + " offset : " + i + " value :" + operationNumber_array);
                         int numTmp = operationNumber_array;
                         nowArrayVariable.setArrayValue(numTmp,offsets);
                     }
@@ -555,12 +554,12 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             else {
                 if (ctx.initVal() != null){
                     visit(ctx.initVal());
-                    if (operationNumber.charAt(0) == '%'){
-                        variable.setValue(computeGlobalVariableValue());
-                    }
-                    else{
-                        variable.setValue(Integer.parseInt(operationNumber));
-                    }
+//                    if (operationNumber.charAt(0) == '%'){
+//                        variable.setValue(computeGlobalVariableValue());
+//                    }
+//                    else{
+                        variable.setValue(operationNumber_global);
+//                    }
                 }
                 else {
                     variable.setValue(0);
@@ -714,9 +713,21 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             variable.setOperationNumber(operationNumber);
             //array
             if (ctx.funcFParam(i).children.size() > 2){
+                variable.setArray(true);
                 variable.setiType("i32*");
                 nowFunction.getParamsType().add("i32*");
                 nowFunction.getParamsName().add(paramName);
+                //exp num + 1 equal to dimensions
+                int expNum = ctx.funcFParam(i).exp().size();
+                variable.setDimensions(expNum+1);
+                variable.getArrayDimensions().add(999);
+                isDefineArray = true;
+                for (int j = 0;j<expNum;j++){
+                    visit(ctx.funcFParam(i).exp(j));
+                    variable.getArrayDimensions().add(operationNumber_array);
+                }
+                isDefineArray = false;
+                variable.computeArrayDimensionWeight();
             }
             //int
             else {
@@ -726,7 +737,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             }
             nowFunction.getFunctionParams().put(paramName,variable);
         }
-        return super.visitFuncFParams(ctx);
+        return null;
     }
 
     @Override
@@ -1063,6 +1074,9 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             if (isDefineArray){
                 operationNumber_array = number;
             }
+            else if (isDefineGlobalVariable){
+                operationNumber_global = number;
+            }
             else {
                 operationNumber = String.valueOf(number);
             }
@@ -1085,8 +1099,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                         operationNumber_array = variable.getValue();
                     }
                     else {
-                        int value = variable.getValue();
-                        operationNumber = String.valueOf(value);
+                        operationNumber_global = variable.getValue();
                     }
                 }
                 else {
@@ -1165,9 +1178,11 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 visit(ctx.exp(i));
                 opNumTmpList.add(operationNumber);
             }
-            if (opNumTmpList.size() != variable.getDimensions()){
-                System.out.println("when lval is array, the [] num is not equal to dimensions");
-                System.exit(-1);
+            while (opNumTmpList.size() != variable.getDimensions()){
+                // TODO add zero when []num < dimension
+                opNumTmpList.add("0");
+//                System.out.println("when lval is array, the [] num is not equal to dimensions");
+//                System.exit(-1);
             }
             for (int i = 0; i<opNumTmpList.size() ; i++){
                 registerNum ++ ;
@@ -1187,8 +1202,12 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             outputList.add(variable.getArrayElementPtrByRegister(operationNumber,"%" + (registerNum-1)));
         }
         else {
-            System.out.println("variable is array , but dont have a[]");
-            System.exit(-1);
+            //TODO only have array varname return the array  0 0
+            registerNum ++ ;
+            operationNumber = "%" + registerNum;
+            outputList.add(variable.getArrayElementPtrByOffsets(operationNumber, new ArrayList<>()));
+//            System.out.println("variable is array , but dont have a[]");
+//            System.exit(-1);
         }
     }
 
@@ -1199,9 +1218,11 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 visit(ctx.exp(i));
                 opNumTmpList.add(operationNumber);
             }
-            if (opNumTmpList.size() != variable.getDimensions()){
-                System.out.println("when lval is array, the [] num is not equal to dimensions");
-                System.exit(-1);
+            while (opNumTmpList.size() != variable.getDimensions()){
+                //TODO add zero when []num < dimension
+                opNumTmpList.add("0");
+//                System.out.println("when lval is array, the [] num is not equal to dimensions");
+//                System.exit(-1);
             }
             for (int i = 0; i<opNumTmpList.size() ; i++){
                 registerNum ++ ;
@@ -1224,8 +1245,12 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             outputList.add(operationNumber + " = load i32, i32* %" + (registerNum-1) + System.lineSeparator());
         }
         else {
-            System.out.println("variable is array , but dont have a[]");
-            System.exit(-1);
+            //TODO only have array varname return the array  0 0
+            registerNum ++ ;
+            operationNumber = "%" + registerNum;
+            outputList.add(variable.getArrayElementPtrByOffsets(operationNumber, new ArrayList<>()));
+//            System.out.println("variable is array , but dont have a[]");
+//            System.exit(-1);
         }
     }
 
@@ -1242,6 +1267,9 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             if(ctx.unaryOp().getText().equals("-")){
                 if (isDefineArray){
                     operationNumber_array = -operationNumber_array;
+                }
+                else if (isDefineGlobalVariable){
+                    operationNumber_global = -operationNumber_global;
                 }
                 else {
                     registerNum++;
@@ -1341,6 +1369,22 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                     operationNumber_array = num1 % num2;
                 }
             }
+            else if (isDefineGlobalVariable){
+                visit(ctx.mulExp());
+                int num1 = operationNumber_global;
+                visit(ctx.unaryExp());
+                int num2 = operationNumber_global;
+                String op = String.valueOf(ctx.getChild(1));
+                if(op.equals("*")){
+                    operationNumber_global = num1 * num2;
+                }
+                else if(op.equals("/")){
+                    operationNumber_global = num1 / num2;
+                }
+                else if(op.equals("%")){
+                    operationNumber_global = num1 % num2;
+                }
+            }
             else {
                 String register1 = null;
                 String register2 = null;
@@ -1389,6 +1433,19 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 }
                 else if(op.equals("-")){
                     operationNumber_array = num1 - num2;
+                }
+            }
+            else if (isDefineGlobalVariable){
+                visit(ctx.addExp());
+                int num1 = operationNumber_global;
+                visit(ctx.mulExp());
+                int num2 = operationNumber_global;
+                String op = String.valueOf(ctx.getChild(1));
+                if(op.equals("+")){
+                    operationNumber_global = num1 + num2;
+                }
+                else if(op.equals("-")){
+                    operationNumber_global = num1 - num2;
                 }
             }
             else {

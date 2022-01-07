@@ -118,52 +118,6 @@ public class Variable {
         return integers;
     }
 
-    public String getArrayElementPtrByDimension(String regNum, int dimension){
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append(regNum + " = getelementptr "
-                + "[" + allLength + " x i32" + "]" + ", " + "[" + allLength + " x i32" + "]" + "* " + operationNumber
-                + ",i32 0," + " i32 "
-        );
-        int len = 0;
-        for (int i = 0; i<dimension ; i++){
-            len = len + arrayDimensions.get(i);
-        }
-        stringBuilder.append(len + System.lineSeparator());
-        return stringBuilder.toString();
-    }
-
-    public String getArrayElementPtrByPosition(String regNum , int position){
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append(regNum + " = getelementptr "
-                + "[" + allLength + " x i32" + "]" + ", " + "[" + allLength + " x i32" + "]" + "* " + operationNumber
-                + ",i32 0," + " i32 "
-        );
-        stringBuilder.append(position + System.lineSeparator());
-        return stringBuilder.toString();
-    }
-
-    public String allocaArrayString(){
-        StringBuilder stringBuilder = new StringBuilder();
-        if (isGlobal){
-
-        }
-        else {
-            stringBuilder.append(operationNumber + " = alloca ");
-            for (int i = 0; i<dimensions ; i++){
-                if ( i == (dimensions-1)){
-                    stringBuilder.append("[" + arrayDimensions.get(i) + " x " + iType + "]");
-                }
-                else {
-                    stringBuilder.append("[" + arrayDimensions.get(i) + " x ");
-                }
-            }
-            if (dimensions > 1){
-                stringBuilder.append("]");
-            }
-            stringBuilder.append(System.lineSeparator());
-        }
-        return stringBuilder.toString();
-    }
 
     public String getiType() {
         return iType;
