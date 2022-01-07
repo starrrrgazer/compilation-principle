@@ -39,6 +39,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     ArrayList<String> functionOutputList = new ArrayList<>();
     boolean isFuncDefBlock = false;
     int operationNumber_global = 0;
+    boolean isRegisterPtr = false; // judge  the register is i32 or i32*
 
     public void initFunctionMap(){
         ArrayList<String> strings = new ArrayList<>();
@@ -49,20 +50,20 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         strings.add("i32*");
         Function function3 = new Function("i32","getarray",false, strings,"declare i32 @getarray(i32*)");
         functionHashMap.put("getarray",function3);
-        strings.clear();
+        strings = new ArrayList<>();
         strings.add("i32");
         Function function4 = new Function("void","putint",false,strings,"declare void @putint(i32)");
         functionHashMap.put("putint",function4);
-        strings.clear();
+        strings = new ArrayList<>();
         strings.add("i32");
         Function function5= new Function("void","putch",false,strings,"declare void @putch(i32)");
         functionHashMap.put("putch",function5);
-        strings.clear();
+        strings = new ArrayList<>();
         strings.add("i32");
         strings.add("i32*");
         Function function6 = new Function("void","putarray",false,strings,"declare void @putarray(i32,i32*)");
         functionHashMap.put("putarray",function6);
-        strings.clear();
+        strings = new ArrayList<>();
         strings.add("i32*");
         strings.add("i32");
         strings.add("i32");
@@ -1131,6 +1132,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 if(variable != null){
                     // if is array
                     if (variable.isArray()){
+                        isRegisterPtr = true;
                         if (variable.isGlobal()){
                             loadNumFromArray(ctx.lVal(),variable);
                         }
@@ -1140,6 +1142,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                     }
                     // is not array
                     else {
+                        isRegisterPtr = false;
                         if (variable.isGlobal()){
                             if (variable.isConst()){
                                 int value = variable.getValue();
@@ -1315,8 +1318,17 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 }
                 //here dont think about putarray and get array
                 else {
+                    //TODO judge the paramsType
+                    isRegisterPtr = false;
                     visit(ctx.funcRParams());
-                    boolean paramsLegal = function.checkParamsType("i32");
+                    boolean paramsLegal;
+                    if (isRegisterPtr){
+                        System.out.println(function.getParamsType());
+                        paramsLegal = function.checkParamsType("i32*");
+                    }
+                    else {
+                        paramsLegal = function.checkParamsType("i32");
+                    }
                     if (paramsLegal){
                         if(function.isDeclare() == false){
                             function.setDeclare(true);
