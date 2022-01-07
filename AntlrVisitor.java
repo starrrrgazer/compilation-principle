@@ -1297,7 +1297,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             registerNum ++;
             operationNumber = "%" + registerNum;
             outputList.add(variable.getArrayElementPtrByRegister(operationNumber,"%" + (registerNum-1)));
-            if (!variable.isFuncParam() && !isRegisterPtr){
+            if ( !isRegisterPtr){
                 registerNum ++;
                 operationNumber = "%" + registerNum;
                 outputList.add(operationNumber + " = load i32, i32* %" + (registerNum-1) + System.lineSeparator());
