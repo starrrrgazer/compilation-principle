@@ -127,6 +127,9 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 if (function.getRetType().equals("void") && !hasReturn){
                     outputList.add("ret void" + System.lineSeparator());
                 }
+                else if (function.getRetType().equals("void") && !outputList.get(outputList.size()-1).contains("ret")){
+                    outputList.add("ret void" + System.lineSeparator());
+                }
                 else if (function.getRetType().equals("int") && !hasReturn){
                     System.out.println("retType is int but had not return");
                     System.exit(-1);
