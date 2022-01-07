@@ -1002,9 +1002,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                     outputList.add("br label %" + registerNum + System.lineSeparator());
                 }
                 outputList.add(System.lineSeparator() + registerNum + ":"+ System.lineSeparator());
-//                registerNum++;
-//                operationNumber = "%" + registerNum;
-//                System.out.println(callbackStack.size());
 
                 integersTmp = callbackStack.pop();
                 for (Integer index : integersTmp){
