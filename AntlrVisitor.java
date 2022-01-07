@@ -937,9 +937,9 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                     isContinue = false;
                 }
                 int retIndex = retStack.pop();
-                ArrayList<Integer> integers2 = callbackStack.get(retIndex);
-                integers2.add(outputList.size()-1);
-                callbackStack.set(retIndex,integers2);
+//                ArrayList<Integer> integers2 = callbackStack.get(retIndex);
+//                integers2.add(outputList.size()-1);
+//                callbackStack.set(retIndex,integers2);
             }
             else if (!isReturn){
                 outputList.add("br label %");
