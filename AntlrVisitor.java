@@ -873,12 +873,13 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                         //first, getelement ptr
                         getPtrFromArray(ctx.lVal(),variable);
                         //then store
-                        if (variable.isGlobal()){
-                            outputList.add("store i32 " + opNumTmp + ", " + variable.getiType() + " " + operationNumber + System.lineSeparator());
+                        if (variable.isArray()){
+                            outputList.add("store i32 " + opNumTmp + ", " + "i32* " + operationNumber + System.lineSeparator());
                         }
                         else {
-                            outputList.add("store i32 " + opNumTmp + ", " + variable.getiType() + " " + operationNumber + System.lineSeparator());
+                            outputList.add("store i32 " + opNumTmp + ", " + "i32 " + operationNumber + System.lineSeparator());
                         }
+
                     }
                     else {
 
