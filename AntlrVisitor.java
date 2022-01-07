@@ -1358,12 +1358,14 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 if(ctx.funcRParams() == null ){
                     if (function.getParamsType().size() == 0){
                         //if had not been declared before, declare it
-                        if(function.isDeclare() == false){
-                            function.setDeclare(true);
+                        if (function.getRetType().equals("i32")){
+                            registerNum ++ ;
+                            operationNumber = "%" + registerNum;
+                            outputList.add(operationNumber + " = call " + function.getRetType() + " @" + function.getFuncName() + "()" + System.lineSeparator());
                         }
-                        registerNum ++ ;
-                        operationNumber = "%" + registerNum;
-                        outputList.add(operationNumber + " = call " + function.getRetType() + " @" + function.getFuncName() + "()" + System.lineSeparator());
+                        else{
+                            outputList.add("call " + function.getRetType() + " @" + function.getFuncName() + "()" + System.lineSeparator());
+                        }
                     }
                     else {
                         System.out.println("function params is not legal");
@@ -1395,6 +1397,11 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                             System.out.println("function params is not legal");
                             System.exit(-1);
                         }
+                    }
+                    if (function.getRetType().equals("i32")){
+                        registerNum ++ ;
+                        operationNumber = "%" + registerNum;
+                        outputList.add(operationNumber + " = ");
                     }
                     outputList.add("call " + function.getRetType() + " @" + function.getFuncName() + "(");
                     for (int i = 0; i< size ;i++){
