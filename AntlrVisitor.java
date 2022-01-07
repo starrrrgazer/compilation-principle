@@ -270,6 +270,9 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             System.out.println("now exit");
         }
         else {
+            if (ctx.compUnit() != null){
+                visit(ctx.compUnit());
+            }
             if (ctx.funcDef() != null){
                 isDefineFunc = true;
                 visit(ctx.funcDef());
@@ -279,9 +282,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 isDefineGlobalVariable = true;
                 visit(ctx.decl());
                 isDefineGlobalVariable = false;
-            }
-            if (ctx.compUnit() != null){
-                visit(ctx.compUnit());
             }
         }
         //exit
@@ -1158,7 +1158,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                     }
                 }
                 else {
-                    System.out.println(nowFunction.getParamsName());
                     System.out.println("var has not been defined");
                     System.exit(-1);
                 }
