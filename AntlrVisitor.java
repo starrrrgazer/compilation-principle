@@ -280,6 +280,9 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 visit(ctx.decl());
                 isDefineGlobalVariable = false;
             }
+            if (ctx.compUnit() != null){
+                visit(ctx.compUnit());
+            }
         }
         //exit
 
@@ -1289,7 +1292,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                     outputList.add(operationNumber + " = add i32 %" + (registerNum-1) + ", %" + (registerNum-2) + System.lineSeparator());
                 }
             }
-            //TODO funcFParams load
+
             registerNum ++;
             operationNumber = "%" + registerNum;
             outputList.add(variable.getArrayElementPtrByRegister(operationNumber,"%" + (registerNum-1)));
