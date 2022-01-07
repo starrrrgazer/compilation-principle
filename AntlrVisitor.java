@@ -119,8 +119,10 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         //define main
         else {
             if (ctx.ident().getText().equals("main")){
-
-                outputList = new ArrayList<>();
+                Function function = new Function();
+                function.setFuncName("main");
+                function.setRetType("i32");
+                nowFunction = function;
                 registerNum = 0;
 
                 outputList.add("define dso_local i32 @main()");
@@ -128,7 +130,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 isFuncDefBlock = true;
                 visit(ctx.block());
                 outputList.add("}");
-                functionHashMap.put("main",new Function());
+                functionHashMap.put("main",function);
             }
             else {
                 System.out.println("main is not the last function");
@@ -795,7 +797,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         //return exp ;
         if(child0.equals("return")){
             super.visitStmt(ctx);
-            outputList.add("ret " + retType + operationNumber + System.lineSeparator());
+            outputList.add("ret " + nowFunction.getRetType() + " " + operationNumber + System.lineSeparator());
             isReturn = true;
         }
         //exp;
