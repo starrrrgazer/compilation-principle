@@ -40,7 +40,12 @@ public class Function {
         this.isDeclare = isDeclear;
         this.paramsName = new ArrayList<>();
         this.functionParams = new HashMap<>();
-        this.paramsType = params;
+        if (params == null){
+            this.paramsType = new ArrayList<>();
+        }
+        else {
+            this.paramsType = params;
+        }
         this.declareString = declareString;
     }
 
