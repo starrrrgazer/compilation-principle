@@ -121,6 +121,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 //block
                 isFuncDefBlock = true;
                 outputList.add(nowFunction.defineFuncString() + " {" + System.lineSeparator());
+                registerNum ++;
                 funcFParamsInit();
                 visit(ctx.block());
                 if (function.getRetType().equals("void") && !hasReturn){
