@@ -24,7 +24,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
 //    ListStack<ArrayList<Block>> blockStack = new ListStack<>();
     ArrayList<Block> blockArrayList = new ArrayList<>();
     ArrayList<String> globalDeclareList = new ArrayList<>();
-    boolean isDefineGlobalVariable = true;
+    boolean isDefineGlobalVariable = false;
     ArrayList<Integer> breakList = new ArrayList<>();
     ArrayList<Integer> continueList = new ArrayList<>();
     boolean isBreak = false;
@@ -40,29 +40,36 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     boolean isFuncDefBlock = false;
     int operationNumber_global = 0;
     boolean isRegisterPtr = false; // judge  the register is i32 or i32*
+    boolean hasReturn = false;
 
     public void initFunctionMap(){
-        ArrayList<String> strings = new ArrayList<>();
+
         Function function = new Function("i32","getint",false,null,"declare i32 @getint()" );
         functionHashMap.put("getint",function);
         Function function2 = new Function("i32","getch",false,null,"declare i32 @getch()");
         functionHashMap.put("getch",function2);
+
+        ArrayList<String> strings = new ArrayList<>();
         strings.add("i32*");
         Function function3 = new Function("i32","getarray",false, strings,"declare i32 @getarray(i32*)");
         functionHashMap.put("getarray",function3);
+
         strings = new ArrayList<>();
         strings.add("i32");
         Function function4 = new Function("void","putint",false,strings,"declare void @putint(i32)");
         functionHashMap.put("putint",function4);
+
         strings = new ArrayList<>();
         strings.add("i32");
         Function function5= new Function("void","putch",false,strings,"declare void @putch(i32)");
         functionHashMap.put("putch",function5);
+
         strings = new ArrayList<>();
         strings.add("i32");
         strings.add("i32*");
         Function function6 = new Function("void","putarray",false,strings,"declare void @putarray(i32,i32*)");
         functionHashMap.put("putarray",function6);
+
         strings = new ArrayList<>();
         strings.add("i32*");
         strings.add("i32");
@@ -108,13 +115,22 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 //ident
                 function.setFuncName(funcName);
                 //funcFParams
-                visit(ctx.funcFParams());
+                if (ctx.funcFParams() != null){
+                    visit(ctx.funcFParams());
+                }
                 //block
                 isFuncDefBlock = true;
-                functionOutputList.add(nowFunction.defineFuncString() + " {" + System.lineSeparator());
-                //TODO init funcFParams
+                outputList.add(nowFunction.defineFuncString() + " {" + System.lineSeparator());
+                funcFParamsInit();
                 visit(ctx.block());
-                functionOutputList.add("}" + System.lineSeparator());
+                if (function.getRetType().equals("void") && !hasReturn){
+                    outputList.add("ret void" + System.lineSeparator());
+                }
+                else if (function.getRetType().equals("int") && !hasReturn){
+                    System.out.println("retType is int but had not return");
+                    System.exit(-1);
+                }
+                outputList.add("}" + System.lineSeparator());
             }
         }
         //define main
@@ -149,7 +165,20 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             if (variable.getiType().equals("i32")){
                 registerNum ++;
                 operationNumber = "%" + registerNum;
-//                functionOutputList.add();
+                outputList.add(operationNumber + " = alloca i32" + System.lineSeparator());
+                outputList.add("store i32 " + variable.getOperationNumber() + ", i32* " + operationNumber + System.lineSeparator());
+                variable.setOperationNumber(operationNumber);
+            }
+            else {
+                registerNum ++;
+                operationNumber = "%" + registerNum;
+                outputList.add(operationNumber + " = alloca i32*" + System.lineSeparator());
+                outputList.add("store i32* " + variable.getOperationNumber() + ", i32* *" + operationNumber + System.lineSeparator());
+                variable.setOperationNumber(operationNumber);
+                registerNum ++;
+                operationNumber = "%" + registerNum;
+                outputList.add(operationNumber + " = load i32* , i32* * " + variable.getOperationNumber() + System.lineSeparator());
+                variable.setOperationNumber(operationNumber);
             }
         }
     }
@@ -221,13 +250,11 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         //first compunit
         if (ctx.getParent() == null){
             initFunctionMap();
-            isDefineGlobalVariable = true;
-            isDefineFunc = true;
+
             if (ctx.compUnit() != null){
                 visit(ctx.compUnit());
             }
-            isDefineFunc = false;
-            isDefineGlobalVariable = false;
+
             if (ctx.funcDef() != null){
                 visit(ctx.funcDef());
             }
@@ -243,7 +270,16 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             System.out.println("now exit");
         }
         else {
-            super.visitCompUnit(ctx);
+            if (ctx.funcDef() != null){
+                isDefineFunc = true;
+                visit(ctx.funcDef());
+                isDefineFunc = false;
+            }
+            if (ctx.decl() != null){
+                isDefineGlobalVariable = true;
+                visit(ctx.decl());
+                isDefineGlobalVariable = false;
+            }
         }
         //exit
 
@@ -289,8 +325,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
     public Object visitBType(MiniSysParser.BTypeContext ctx) {
         return super.visitBType(ctx);
     }
-
-
 
     @Override
     public Object visitConstDef(MiniSysParser.ConstDefContext ctx) {
@@ -797,9 +831,22 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
         String child0 = ctx.getChild(0).getText();
         //return exp ;
         if(child0.equals("return")){
-            super.visitStmt(ctx);
-            outputList.add("ret " + nowFunction.getRetType() + " " + operationNumber + System.lineSeparator());
-            isReturn = true;
+            if (nowFunction.getRetType().equals("void")){
+                if (ctx.exp() != null){
+                    System.out.println("function retType is void but has return exp");
+                    System.exit(-1);
+                }
+                else {
+                    hasReturn = true;
+                    outputList.add("ret " + nowFunction.getRetType() + System.lineSeparator());
+                }
+            }
+            else {
+                visit(ctx.exp());
+                outputList.add("ret " + nowFunction.getRetType() + " " + operationNumber + System.lineSeparator());
+                hasReturn = true;
+                isReturn = true;
+            }
         }
         //exp;
         else if (ctx.lVal()==null && ctx.exp() != null ){
@@ -824,13 +871,14 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                         getPtrFromArray(ctx.lVal(),variable);
                         //then store
                         if (variable.isGlobal()){
-                            outputList.add("store i32 " + opNumTmp + ", " + variable.getiType() + "* " + operationNumber + System.lineSeparator());
+                            outputList.add("store i32 " + opNumTmp + ", " + variable.getiType() + " " + operationNumber + System.lineSeparator());
                         }
                         else {
-                            outputList.add("store i32 " + opNumTmp + ", " + variable.getiType() + "* " + operationNumber + System.lineSeparator());
+                            outputList.add("store i32 " + opNumTmp + ", " + variable.getiType() + " " + operationNumber + System.lineSeparator());
                         }
                     }
                     else {
+
                         if (variable.isGlobal()){
                             outputList.add("store i32 " + operationNumber + ", " + variable.getiType() + "* @" + variable.getVarName() + System.lineSeparator());
                         }
@@ -1106,6 +1154,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                     }
                 }
                 else {
+                    System.out.println(nowFunction.getParamsName());
                     System.out.println("var has not been defined");
                     System.exit(-1);
                 }
@@ -1184,7 +1233,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 opNumTmpList.add(operationNumber);
             }
             while (opNumTmpList.size() != variable.getDimensions()){
-                // TODO add zero when []num < dimension
                 opNumTmpList.add("0");
 //                System.out.println("when lval is array, the [] num is not equal to dimensions");
 //                System.exit(-1);
@@ -1207,7 +1255,6 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             outputList.add(variable.getArrayElementPtrByRegister(operationNumber,"%" + (registerNum-1)));
         }
         else {
-            //TODO only have array varname return the array  0 0
             registerNum ++ ;
             operationNumber = "%" + registerNum;
             outputList.add(variable.getArrayElementPtrByOffsets(operationNumber, new ArrayList<>()));
@@ -1242,12 +1289,15 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                     outputList.add(operationNumber + " = add i32 %" + (registerNum-1) + ", %" + (registerNum-2) + System.lineSeparator());
                 }
             }
+            //TODO funcFParams load
             registerNum ++;
             operationNumber = "%" + registerNum;
             outputList.add(variable.getArrayElementPtrByRegister(operationNumber,"%" + (registerNum-1)));
-            registerNum ++;
-            operationNumber = "%" + registerNum;
-            outputList.add(operationNumber + " = load i32, i32* %" + (registerNum-1) + System.lineSeparator());
+            if (!variable.isFuncParam() && !isRegisterPtr){
+                registerNum ++;
+                operationNumber = "%" + registerNum;
+                outputList.add(operationNumber + " = load i32, i32* %" + (registerNum-1) + System.lineSeparator());
+            }
         }
         else {
             isRegisterPtr = true;
@@ -1302,7 +1352,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 //judge whether params is legal
                 // no paramas: getint getch
                 if(ctx.funcRParams() == null ){
-                    if (function.getParamsType() == null){
+                    if (function.getParamsType().size() == 0){
                         //if had not been declared before, declare it
                         if(function.isDeclare() == false){
                             function.setDeclare(true);
@@ -1318,27 +1368,40 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 }
                 //here dont think about putarray and get array
                 else {
-                    //TODO judge the paramsType
-                    isRegisterPtr = false;
-                    visit(ctx.funcRParams());
-                    boolean paramsLegal;
-                    if (isRegisterPtr){
-                        System.out.println(function.getParamsType());
-                        paramsLegal = function.checkParamsType("i32*");
-                    }
-                    else {
-                        paramsLegal = function.checkParamsType("i32");
-                    }
-                    if (paramsLegal){
-                        if(function.isDeclare() == false){
-                            function.setDeclare(true);
-                        }
-                        outputList.add("call " + function.getRetType() + " @" + function.getFuncName() + "(" + "i32 " + operationNumber +")" + System.lineSeparator());
-                    }
-                    else {
-                        System.out.println("function params is not legal");
+                    int size = ctx.funcRParams().exp().size();
+                    if (size != function.getParamsType().size()){
+                        System.out.println("call function params num is not equal to need function");
                         System.exit(-1);
                     }
+                    ArrayList<String> opNumTmpList = new ArrayList<>();
+                    boolean paramsLegal;
+                    for (int i = 0; i<size;i++){
+                        isRegisterPtr = false;
+                        visit(ctx.funcRParams().exp(i));
+                        if (isRegisterPtr){
+                            paramsLegal = function.checkParamsType("i32*",i);
+                        }
+                        else {
+                            paramsLegal = function.checkParamsType("i32",i);
+                        }
+                        if (paramsLegal){
+                             opNumTmpList.add(operationNumber);
+                        }
+                        else {
+                            System.out.println("function params is not legal");
+                            System.exit(-1);
+                        }
+                    }
+                    outputList.add("call " + function.getRetType() + " @" + function.getFuncName() + "(");
+                    for (int i = 0; i< size ;i++){
+                        outputList.add(function.getParamsType().get(i) + " " + opNumTmpList.get(i));
+                        if (i != size-1){
+                            outputList.add(", ");
+                        }
+                    }
+                    outputList.add(")" + System.lineSeparator());
+
+
                 }
             }
             else {

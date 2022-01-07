@@ -38,7 +38,6 @@ public class Function {
         this.retType = retType;
         this.funcName = funcName;
         this.isDeclare = isDeclear;
-        this.paramsType = new ArrayList<>();
         this.paramsName = new ArrayList<>();
         this.functionParams = new HashMap<>();
         this.paramsType = params;
@@ -53,16 +52,16 @@ public class Function {
         for (int i = 0;i < paramNum-1 ;i ++){
             stringBuilder.append(paramsType.get(i) + " %" + i + ", ");
         }
-        stringBuilder.append(paramsType.get(paramNum-1) + " %" + (paramNum-1) + ")");
+        if (paramNum > 0){
+            stringBuilder.append(paramsType.get(paramNum-1) + " %" + (paramNum-1) + ")");
+        }
         return stringBuilder.toString();
     }
-    public boolean checkParamsType(String params){
-        for (String param : paramsType){
-            if (param.equals(params)){
-                return true;
-            }
+    public boolean checkParamsType(String paramType, int num){
+        if (!paramsType.get(num).equals(paramType)){
+            return false;
         }
-        return false;
+        return true;
     }
 
     public String getRetType() {

@@ -91,24 +91,36 @@ public class Variable {
     }
 
     public String getArrayElementPtrByRegister(String regNum, String register){
-        return regNum + " = getelementptr "
-                + "[" + allLength + " x i32" + "]" + ", " + "[" + allLength + " x i32" + "]" + "* " + operationNumber
-                + ", i32 0," + " i32 " + register + System.lineSeparator();
+        if (isFuncParam){
+            return regNum + " = getelementptr "
+                    + "i32, i32* " + operationNumber
+                    + ", i32 " + register + System.lineSeparator();
+        }
+        else {
+            return regNum + " = getelementptr "
+                    + "[" + allLength + " x i32" + "]" + ", " + "[" + allLength + " x i32" + "]" + "* " + operationNumber
+                    + ", i32 0," + " i32 " + register + System.lineSeparator();
+        }
     }
 
     public String getArrayElementPtrByOffsets(String regNum, ArrayList<Integer> offsets){
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append(regNum + " = getelementptr "
-                + "[" + allLength + " x i32" + "]" + ", " + "[" + allLength + " x i32" + "]" + "* " + operationNumber
-                + ", i32 0," + " i32 "
-        );
-        int len = 0;
-        offsets = addZeroToIntArray(offsets);
-        for (int i = 0; i<dimensions ; i++){
-            len = len + offsets.get(i) * arrayDimensionsWeight.get(i);
-        }
-        stringBuilder.append(len + System.lineSeparator());
-        return stringBuilder.toString();
+//        if (isFuncParam){
+//            return null;
+//        }
+//        else {
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder.append(regNum + " = getelementptr "
+                    + "[" + allLength + " x i32" + "]" + ", " + "[" + allLength + " x i32" + "]" + "* " + operationNumber
+                    + ", i32 0," + " i32 "
+            );
+            int len = 0;
+            offsets = addZeroToIntArray(offsets);
+            for (int i = 0; i<dimensions ; i++){
+                len = len + offsets.get(i) * arrayDimensionsWeight.get(i);
+            }
+            stringBuilder.append(len + System.lineSeparator());
+            return stringBuilder.toString();
+//        }
     }
 
     public ArrayList<Integer> addZeroToIntArray(ArrayList<Integer> integers){
