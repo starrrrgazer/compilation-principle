@@ -1132,7 +1132,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 if(variable != null){
                     // if is array
                     if (variable.isArray()){
-                        isRegisterPtr = true;
+                        isRegisterPtr = false;
                         if (variable.isGlobal()){
                             loadNumFromArray(ctx.lVal(),variable);
                         }
@@ -1224,7 +1224,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
                 opNumTmpList.add(operationNumber);
             }
             while (opNumTmpList.size() != variable.getDimensions()){
-                //TODO add zero when []num < dimension
+                isRegisterPtr = true;
                 opNumTmpList.add("0");
 //                System.out.println("when lval is array, the [] num is not equal to dimensions");
 //                System.exit(-1);
@@ -1250,7 +1250,7 @@ public class AntlrVisitor extends MiniSysBaseVisitor {
             outputList.add(operationNumber + " = load i32, i32* %" + (registerNum-1) + System.lineSeparator());
         }
         else {
-            //TODO only have array varname return the array  0 0
+            isRegisterPtr = true;
             registerNum ++ ;
             operationNumber = "%" + registerNum;
             outputList.add(variable.getArrayElementPtrByOffsets(operationNumber, new ArrayList<>()));
