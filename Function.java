@@ -58,8 +58,9 @@ public class Function {
             stringBuilder.append(paramsType.get(i) + " %" + i + ", ");
         }
         if (paramNum > 0){
-            stringBuilder.append(paramsType.get(paramNum-1) + " %" + (paramNum-1) + ")");
+            stringBuilder.append(paramsType.get(paramNum-1) + " %" + (paramNum-1));
         }
+        stringBuilder.append(")");
         return stringBuilder.toString();
     }
     public boolean checkParamsType(String paramType, int num){
